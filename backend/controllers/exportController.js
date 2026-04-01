@@ -1,0 +1,85 @@
+import Quotation from "../models/Quotation.js";
+import { generateQuotationPDF } from "../services/pdfService.js";
+import { sendQuotationEmail } from "../services/emailService.js";
+
+/**
+ * =======================================
+ * 📄 DOWNLOAD PDF DIRECTLY
+ * GET /api/export/pdf/:id
+ * =======================================
+ */
+export const downloadPDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Find the quotation in the database
+    const quotation = await Quotation.findById(id);
+
+    if (!quotation) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Quotation not found ❌" 
+      });
+    }
+
+    // 2. Generate PDF and send directly as response stream
+    // Note: generateQuotationPDF handles the res.send() internally
+    await generateQuotationPDF(quotation, res);
+
+  } catch (error) {
+    console.error("🔥 Download PDF Error:", error.message);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to generate and download PDF ❌",
+      error: error.message 
+    });
+  }
+};
+
+/**
+ * =======================================
+ * 📧 SEND QUOTATION VIA EMAIL (AS ATTACHMENT)
+ * POST /api/export/email
+ * =======================================
+ */
+export const sendEmail = async (req, res) => {
+  try {
+    const { quotationId, email } = req.body;
+
+    // 1. Validate inputs
+    if (!quotationId || !email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Both Quotation ID and Email address are required ❌" 
+      });
+    }
+
+    // 2. Fetch the quotation from DB
+    const quotation = await Quotation.findById(quotationId);
+
+    if (!quotation) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Quotation not found in database ❌" 
+      });
+    }
+
+    // 3. Trigger Email Service (Which will generate the PDF buffer and send it)
+    await sendQuotationEmail(email, quotation);
+
+    // 4. Send success response to frontend
+    return res.status(200).json({
+      success: true,
+      message: `✅ Quotation successfully sent to ${email}`,
+    });
+
+  } catch (error) {
+    console.error("🔥 Send Email Error:", error.message);
+    
+    return res.status(500).json({ 
+      success: false, 
+      message: "Failed to send email. Please check server configuration.",
+      error: error.message 
+    });
+  }
+};
