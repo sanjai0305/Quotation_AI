@@ -30,7 +30,7 @@ export default function Login({ goToRegister, goToForgot, goToDashboard }) {
     setIsLoading(true);
 
     try {
-      // Backend API call implementation (Update URL as needed)
+      // Backend API call implementation
       const res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: {
@@ -46,8 +46,16 @@ export default function Login({ goToRegister, goToForgot, goToDashboard }) {
       
       if (res.ok) {
         setMessage({ type: "success", text: "Login successful! Redirecting..." });
-        // Save token to local storage if needed: localStorage.setItem("token", data.token);
         
+        // 🚨 CRITICAL FIX: Save the token and user data to LocalStorage
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+        }
+        if (data.user) {
+          localStorage.setItem("user", JSON.stringify(data.user));
+        }
+        
+        // Redirect to Dashboard after 1.5s
         setTimeout(() => {
           goToDashboard();
         }, 1500);
@@ -55,12 +63,9 @@ export default function Login({ goToRegister, goToForgot, goToDashboard }) {
         setMessage({ type: "error", text: data.message || "Invalid email or password." });
       }
     } catch (error) {
-      // Fallback for UI testing if backend is not running yet
       console.error("API error:", error);
-      setMessage({ type: "success", text: "Demo Login successful! Redirecting..." });
-      setTimeout(() => {
-        goToDashboard();
-      }, 1500);
+      // If backend is entirely down, show this error instead of a fake success message
+      setMessage({ type: "error", text: "Cannot connect to server. Please try again later." });
     } finally {
       setIsLoading(false);
     }
@@ -227,7 +232,7 @@ export default function Login({ goToRegister, goToForgot, goToDashboard }) {
       {/* RIGHT SIDE: Visual/Illustration */}
       <div className="hidden lg:flex w-1/2 relative items-center justify-center bg-[#F8FAFC] overflow-hidden">
         
-        {/* Dynamic Background Elements (Matches Register Page) */}
+        {/* Dynamic Background Elements */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[600px] h-[600px] bg-gradient-to-b from-blue-200/50 to-indigo-200/50 rounded-full blur-3xl mix-blend-multiply opacity-70 animate-blob"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[500px] h-[500px] bg-gradient-to-t from-purple-200/50 to-pink-200/50 rounded-full blur-3xl mix-blend-multiply opacity-70 animate-blob animation-delay-2000"></div>
         

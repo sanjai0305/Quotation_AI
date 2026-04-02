@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "./Sidebar";
 import { 
   Building2, Ruler, CalendarClock, FileText, TableProperties, 
   Tag, CreditCard, Landmark, PenTool, Save, Eye, RotateCcw, 
   Plus, Trash2, CheckCircle2, AlertCircle, Image as ImageIcon,
-  XCircle
+  XCircle, X
 } from "lucide-react";
 
 // ==========================================
-// 🔥 API FUNCTIONS (Updated with Token)
+// 🔥 API FUNCTIONS
 // ==========================================
 const BASE_URL = "http://localhost:5000/api/quotations";
 
@@ -27,6 +27,22 @@ export const createQuotation = async (data) => {
   return { ok: res.ok, data: responseData };
 };
 
+// 🔥 Function to Update existing quotation
+export const updateQuotationAPI = async (id, data) => {
+  const token = localStorage.getItem("token"); 
+  
+  const res = await fetch(`${BASE_URL}/${id}`, {
+    method: "PUT",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}` 
+    },
+    body: JSON.stringify(data),
+  });
+  const responseData = await res.json();
+  return { ok: res.ok, data: responseData };
+};
+
 // ==========================================
 // 🔥 MAIN COMPONENT
 // ==========================================
@@ -35,10 +51,13 @@ export default function CreateQuotation({
   goToPreview,
   goToExport,
   goToDashboard,
-  setQuotationId, 
+  setQuotationId,
+  quotationId // 🚨 Passed from App.jsx to know if we're editing
 }) {
   
-  // 🔥 MAGIC FIX: Load Initial State from LocalStorage to prevent empty form on "Edit Draft"
+  // 🔥 Reference for hidden file input
+  const fileInputRef = useRef(null);
+
   const getInitialData = () => {
     const savedDraft = localStorage.getItem("previewDraft");
     if (savedDraft) {
@@ -48,9 +67,8 @@ export default function CreateQuotation({
         console.error("Failed to parse saved draft:", error);
       }
     }
-    // Default Data if no draft exists
     return {
-      projectDetails: { companyName: "", clientName: "", projectName: "", referenceNo: "", date: new Date().toISOString().split('T')[0], paintBrand: "Nippon Paint" },
+      projectDetails: { companyLogo: "", companyName: "", clientName: "", projectName: "", referenceNo: "", date: new Date().toISOString().split('T')[0], paintBrand: "Nippon Paint" },
       areaDetails: { interiorArea: "", exteriorArea: "" },
       coverLetter: { subject: "Paint Quote For", body: "Thank you for your purchase enquiry for the above mentioned site. Please find below our quotation for Material & Labour for this site." },
       rateTable: [
@@ -74,27 +92,47 @@ export default function CreateQuotation({
     };
   };
 
-  // Initialize State
   const [formData, setFormData] = useState(getInitialData);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
-  // Sync every change instantly to LocalStorage so Preview sees it and Edit remembers it
   useEffect(() => {
     localStorage.setItem("previewDraft", JSON.stringify(formData));
   }, [formData]);
 
-  // 🔥 CALCULATE TOTALS FOR RATE TABLE UI
   const totalLabour = formData.rateTable.reduce((acc, row) => acc + (Number(row.labour) || 0), 0);
   const totalMaterial = formData.rateTable.reduce((acc, row) => acc + (Number(row.material) || 0), 0);
   const totalSqft = formData.rateTable.reduce((acc, row) => acc + (Number(row.total) || 0), 0);
 
-  // 🔥 HANDLERS
   const handleNestedChange = (section, field, value) => {
     setFormData((prev) => ({
       ...prev,
       [section]: { ...prev[section], [field]: value },
     }));
+  };
+
+  // 🔥 LOGO UPLOAD HANDLER
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setToast({ show: true, message: "Image size must be less than 2MB!", type: "error" });
+      setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = () => {
+      handleNestedChange("projectDetails", "companyLogo", reader.result);
+    };
+  };
+
+  // 🔥 REMOVE LOGO HANDLER
+  const removeLogo = () => {
+    handleNestedChange("projectDetails", "companyLogo", "");
+    if(fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleRateTableChange = (id, field, value) => {
@@ -127,15 +165,44 @@ export default function CreateQuotation({
     }));
   };
 
+  // 🔥 UPDATED: Smooth Reset Logic (No Reload)
   const handleReset = () => {
     if(window.confirm("Are you sure you want to clear all data?")) {
-       localStorage.removeItem("previewDraft"); // Clear draft
-       window.location.reload(); // Reload to start fresh
+       localStorage.removeItem("previewDraft"); 
+       if (setQuotationId) setQuotationId(null); // Clear active ID
+       
+       // Manually reset state instead of reloading page
+       setFormData({
+         projectDetails: { companyLogo: "", companyName: "", clientName: "", projectName: "", referenceNo: "", date: new Date().toISOString().split('T')[0], paintBrand: "Nippon Paint" },
+         areaDetails: { interiorArea: "", exteriorArea: "" },
+         coverLetter: { subject: "Paint Quote For", body: "Thank you for your purchase enquiry for the above mentioned site. Please find below our quotation for Material & Labour for this site." },
+         rateTable: [
+           { id: 1, work: "Surface Preparation, Wall Putty (3 Coats)", labour: 5, material: 3, total: 8 },
+           { id: 2, work: "Primer (1 Coat)", labour: 1, material: 1, total: 2 },
+           { id: 3, work: "Premium Emulsion (2 Coats)", labour: 3, material: 5, total: 8 },
+           { id: 4, work: "Accessories", labour: 0, material: 1, total: 1 }
+         ],
+         pricing: { discount: "", warranty: "3" },
+         timeline: { startDate: "", endDate: "" },
+         textAreas: { 
+           scopeOfWork: "1. Surface preparation including cleaning, scraping, and sanding\n2. Application of wall putty (as per specification)\n3. Application of primer coat\n4. Application of finish coats (as per specification)\n5. All necessary touch-ups and corrections", 
+           exclusions: "1. Structural repairs or civil work\n2. Waterproofing treatment\n3. Texture finishes (unless specified)\n4. Furniture or fixture painting", 
+           termsConditions: "1. Scaffolding must be provided by the client wherever rope scaffolding is not possible.\n2. If rework is required after texture completion, additional charges will apply.\n3. Rates are given as per existing square feet area. Final measurement taken after completion.\n4. The work order should be raised in the name of the applicator or authorized vendor." 
+         },
+         paymentTerms: { step1: "Advance (before mobilization)", step2: "Mid of the work", step3: "After successful completion" },
+         paymentPercents: { p1: "50", p2: "30", p3: "20" },
+         validity: "The price quoted here will be valid for 30 days from the date of issue or till further price increase in material, whichever is earlier.",
+         bankDetails: { bankName: "", accountHolder: "", accountNumber: "", ifscCode: "", branch: "" },
+         signature: { name: "", designation: "", phone: "", email: "" }
+       });
+
+       setToast({ show: true, message: "Form cleared successfully!", type: "success" });
+       setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
     }
   };
 
+  // 🔥 Save Logic (Create vs Update)
   const handleSave = async () => {
-    // 🚨 VALIDATION
     if (!formData.projectDetails.clientName.trim()) {
       setToast({ show: true, message: "Client Name is required!", type: "error" });
       setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
@@ -144,16 +211,26 @@ export default function CreateQuotation({
 
     setIsSaving(true);
     try {
-      const response = await createQuotation(formData);
+      let response;
+      
+      // Check if we are updating an existing quote or creating a new one
+      if (quotationId) {
+        response = await updateQuotationAPI(quotationId, formData);
+      } else {
+        response = await createQuotation(formData);
+      }
       
       if (response.ok) {
-        setToast({ show: true, message: "Quotation saved successfully!", type: "success" });
+        setToast({ 
+          show: true, 
+          message: quotationId ? "Quotation updated successfully!" : "Quotation saved successfully!", 
+          type: "success" 
+        });
         
         const newId = response.data?._id || response.data?.data?._id;
         if (setQuotationId && newId) {
           setQuotationId(newId);
         }
-        
       } else {
         setToast({ show: true, message: response.data?.message || "Failed to save quotation.", type: "error" });
       }
@@ -166,9 +243,6 @@ export default function CreateQuotation({
     }
   };
 
-  // ==========================================
-  // 🎨 UI DESIGN TOKENS
-  // ==========================================
   const inputStyle = "w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all";
   const labelStyle = "block text-xs font-bold text-gray-700 mb-1.5";
   const cardStyle = "bg-white rounded-2xl p-7 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 mb-6";
@@ -177,7 +251,6 @@ export default function CreateQuotation({
   return (
     <div className="bg-[#f8fafc] min-h-screen font-sans selection:bg-blue-100">
       
-      {/* Toast */}
       {toast.show && (
         <div className={`fixed top-20 right-8 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
           {toast.type === 'success' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
@@ -185,17 +258,17 @@ export default function CreateQuotation({
         </div>
       )}
 
-      {/* SIDEBAR */}
       <div className="fixed top-0 left-0 h-screen w-[250px] z-30 shadow-md">
         <Sidebar active="create" goToDashboard={goToDashboard} goToCreate={() => {}} goToPreview={goToPreview} goToExport={goToExport} />
       </div>
 
       <div className="ml-[250px] h-screen flex flex-col">
         
-        {/* HEADER */}
         <div className="flex justify-between items-center px-8 py-5 bg-white sticky top-0 z-20 border-b border-gray-200">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Create Quotation</h1>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              {quotationId ? "Edit Quotation" : "Create Quotation"}
+            </h1>
             <p className="text-sm text-gray-500 mt-1">Build a professional quotation with AI-powered suggestions</p>
           </div>
 
@@ -203,12 +276,13 @@ export default function CreateQuotation({
             <button onClick={handleReset} className="flex items-center gap-2 text-sm font-semibold text-gray-600 px-4 py-2 hover:bg-gray-100 rounded-lg transition-colors"><RotateCcw size={16}/> Reset</button>
             <button onClick={goToPreview} className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 px-5 py-2 rounded-lg hover:bg-gray-50 shadow-sm transition-colors"><Eye size={16}/> Preview</button>
             <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 text-sm font-bold bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 shadow-sm transition-colors disabled:opacity-70">
-              {isSaving ? "Saving..." : <><Save size={16}/> Save</>}
+              {isSaving ? "Saving..." : (
+                <><Save size={16}/> {quotationId ? "Update Quote" : "Save Quote"}</>
+              )}
             </button>
           </div>
         </div>
 
-        {/* CONTENT */}
         <div className="flex-1 overflow-y-auto p-8 max-w-5xl mx-auto w-full pb-24">
           
           {/* PROJECT DETAILS CARD */}
@@ -221,12 +295,38 @@ export default function CreateQuotation({
               </div>
             </div>
 
+            {/* 🔥 INTERACTIVE LOGO UPLOAD SECTION */}
             <div className="mb-6">
               <label className={labelStyle}>Company Logo</label>
-              <div className="w-80 border-2 border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-center gap-3 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-all">
-                <ImageIcon className="text-gray-400" size={20}/>
-                <span className="text-sm text-gray-500 font-medium">Upload Logo (PNG, JPG — max 2MB)</span>
-              </div>
+              
+              <input 
+                type="file" 
+                accept="image/png, image/jpeg, image/jpg" 
+                ref={fileInputRef}
+                className="hidden" 
+                onChange={handleLogoUpload} 
+              />
+
+              {formData.projectDetails.companyLogo ? (
+                <div className="relative w-48 h-24 border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center group">
+                  <img src={formData.projectDetails.companyLogo} alt="Logo" className="w-full h-full object-contain p-2" />
+                  <button 
+                    onClick={removeLogo}
+                    className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove Logo"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => fileInputRef.current.click()}
+                  className="w-80 border-2 border-dashed border-gray-300 rounded-xl p-4 flex items-center justify-center gap-3 bg-gray-50 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-600 cursor-pointer transition-all"
+                >
+                  <ImageIcon size={20} className="text-gray-400 group-hover:text-blue-500"/>
+                  <span className="text-sm text-gray-500 font-medium">Upload Logo (PNG, JPG — max 2MB)</span>
+                </div>
+              )}
             </div>
             
             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
@@ -341,7 +441,7 @@ export default function CreateQuotation({
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div><label className={labelStyle}>Discount (%)</label><input type="number" className={inputStyle} value={formData.pricing.discount} onChange={(e) => handleNestedChange("pricing", "discount", e.target.value)} /></div>
-                <div><label className={labelStyle}>Warranty (Years)</label><input type="number" className={inputStyle} value={formData.pricing.warranty} onChange={(e) => handleNestedChange("pricing", "warranty", e.target.value)} /></div>
+                <div><label className={labelStyle}>Warranty (Years)</label><input type="text" className={inputStyle} value={formData.pricing.warranty} onChange={(e) => handleNestedChange("pricing", "warranty", e.target.value)} /></div>
               </div>
             </div>
             

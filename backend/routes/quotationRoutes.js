@@ -7,69 +7,61 @@ import {
   deleteQuotation,
   getDashboardStats,
 } from "../controllers/quotationController.js";
+import protect from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // ==============================
 // 🔥 MIDDLEWARE: VALIDATE OBJECT ID
 // ==============================
-// Prevents app crash if someone passes an invalid MongoDB ID in the URL
 const validateObjectId = (req, res, next, id) => {
   const isValid = /^[0-9a-fA-F]{24}$/.test(id);
-
   if (!isValid) {
     return res.status(400).json({
       success: false,
-      message: "Invalid quotation ID format",
+      message: "Invalid quotation ID format ❌",
     });
   }
-
   next();
 };
 
-// Bind the validation middleware to the "id" parameter
+// Bind validation to "id" parameter
 router.param("id", validateObjectId);
 
 // ==============================
-// 📊 DASHBOARD ROUTE
+// 🌐 PUBLIC ROUTE (For Clients)
 // ==============================
-// ⚠️ IMPORTANT: Must be placed before "/:id" routes so "stats" isn't treated as an ID
-router.get("/stats", getDashboardStats);
+// 🚨 No 'protect' here! This allows clients to view the quote via link.
+router.get("/public/:id", getQuotationById);
 
 // ==============================
-// ➕ CREATE QUOTATION
+// 📊 DASHBOARD ROUTE (Protected)
 // ==============================
-router.post("/", createQuotation);
+router.get("/stats", protect, getDashboardStats);
 
 // ==============================
-// 📄 GET ALL QUOTATIONS
+// ➕ CREATE QUOTATION (Protected)
 // ==============================
-// Supports query params handled in controller: ?skip=0&limit=50&search=clientName
-router.get("/", getAllQuotations);
+router.post("/", protect, createQuotation);
 
 // ==============================
-// 🔍 GET SINGLE QUOTATION
+// 📄 GET ALL QUOTATIONS (Protected)
 // ==============================
-router.get("/:id", getQuotationById);
+router.get("/", protect, getAllQuotations);
 
 // ==============================
-// ✏️ UPDATE QUOTATION
+// 🔍 GET SINGLE QUOTATION (Protected - Internal Use)
 // ==============================
-router.put("/:id", updateQuotation);
+router.get("/:id", protect, getQuotationById);
 
 // ==============================
-// ❌ DELETE QUOTATION
+// ✏️ UPDATE QUOTATION (Protected)
 // ==============================
-router.delete("/:id", deleteQuotation);
+router.put("/:id", protect, updateQuotation);
 
 // ==============================
-// 🚫 FALLBACK (OPTIONAL DEBUG)
+// ❌ DELETE QUOTATION (Protected)
 // ==============================
-router.all("*", (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Invalid quotation route",
-  });
-});
+router.delete("/:id", protect, deleteQuotation);
 
 export default router;

@@ -1,27 +1,12 @@
+// ==============================
+// 🔐 PRE-LOAD ENV (ES MODULE FIX)
+// ==============================
+import "dotenv/config"; // This MUST be the very first line!
+
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import path from "path";
-import { fileURLToPath } from "url";
-
-// ==============================
-// 🔐 LOAD ENV (FIXED)
-// ==============================
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Force load .env from backend folder
-dotenv.config({ path: path.join(__dirname, ".env") });
-
-// 🔍 DEBUG (REMOVE LATER)
-console.log("📧 EMAIL_USER:", process.env.EMAIL_USER);
-console.log(
-  "📧 EMAIL_PASS:",
-  process.env.EMAIL_PASS ? "Loaded ✅" : "Missing ❌"
-);
-console.log("🔑 JWT_SECRET:", process.env.JWT_SECRET ? "Loaded ✅" : "Missing ❌");
 
 // ==============================
 // ⚙️ CONFIG
@@ -40,6 +25,13 @@ import exportRoutes from "./routes/exportRoutes.js";
 // 🛡️ MIDDLEWARE
 // ==============================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
+
+// 🔍 DEBUG ENV VARIABLES
+console.log("---------------------------------");
+console.log("📧 EMAIL_USER:", process.env.EMAIL_USER || "Missing ❌");
+console.log("📧 EMAIL_PASS:", process.env.EMAIL_PASS ? "Loaded ✅" : "Missing ❌");
+console.log("🔑 JWT_SECRET:", process.env.JWT_SECRET ? "Loaded ✅" : "Missing ❌");
+console.log("---------------------------------");
 
 // ==============================
 // 🚀 INIT APP
@@ -63,6 +55,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
@@ -80,7 +73,7 @@ app.use(
 // 🧠 BODY PARSER
 // ==============================
 app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // ==============================
 // 📜 LOGGER
@@ -95,14 +88,14 @@ if (process.env.NODE_ENV !== "production") {
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "API running 🚀",
+    message: "QuoteGen API is running 🚀",
     env: process.env.NODE_ENV || "development",
     time: new Date().toISOString(),
   });
 });
 
 // ==============================
-// 🚀 API ROUTES
+// 🚀 MAIN API ROUTES
 // ==============================
 app.use("/api/auth", authRoutes);
 app.use("/api/quotations", quotationRoutes);
@@ -119,30 +112,29 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ==============================
-// 🚀 START SERVER
+// 🚀 START SERVER & SERVICES
 // ==============================
 const PORT = process.env.PORT || 5000;
 let server;
 
 const startServer = async () => {
   try {
-    // 1️⃣ Connect DB
+    // 1️⃣ Connect to MongoDB
     await connectDB();
-    console.log("✅ MongoDB Connected");
+    console.log("✅ MongoDB Connected successfully");
 
-    // 2️⃣ Verify Mail
-    if (verifyMailConnection) {
+    // 2️⃣ Verify Mail Transporter
+    if (typeof verifyMailConnection === 'function') {
       await verifyMailConnection();
-      console.log("✅ Mail Server Ready");
     }
 
-    // 3️⃣ Start Server
+    // 3️⃣ Start Express Server
     server = app.listen(PORT, () => {
       console.log(`
 =================================
-🚀 Server running
+🚀 Server running securely
 🌐 http://localhost:${PORT}
-📦 ENV: ${process.env.NODE_ENV}
+📦 ENV: ${process.env.NODE_ENV || 'development'}
 =================================
       `);
     });
@@ -158,11 +150,12 @@ startServer();
 // 🛑 GRACEFUL SHUTDOWN
 // ==============================
 const shutdown = (signal) => {
-  console.log(`\n🛑 ${signal} received`);
+  console.log(`\n🛑 ${signal} received... Shutting down gracefully.`);
 
   if (server) {
     server.close(() => {
-      console.log("💤 Server closed");
+      console.log("💤 HTTP server closed.");
+      // If you want to close DB connection here, you can do mongoose.connection.close()
       process.exit(0);
     });
   } else {
@@ -170,5 +163,6 @@ const shutdown = (signal) => {
   }
 };
 
+// Listen for termination signals (Ctrl+C, Docker stop, etc.)
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));

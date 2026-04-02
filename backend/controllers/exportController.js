@@ -4,7 +4,7 @@ import { sendQuotationEmail } from "../services/emailService.js";
 
 /**
  * =======================================
- * 📄 DOWNLOAD PDF DIRECTLY
+ * 📄 VIEW & DOWNLOAD PDF
  * GET /api/export/pdf/:id
  * =======================================
  */
@@ -22,17 +22,28 @@ export const downloadPDF = async (req, res) => {
       });
     }
 
+    // 🔥 SET HEADERS FOR INLINE VIEWING
+    // Ithu thaan PDF-ah browser tab-la open panna vekkum
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="Quotation_${quotation.projectDetails?.referenceNo || 'Draft'}.pdf"`
+    );
+
     // 2. Generate PDF and send directly as response stream
     // Note: generateQuotationPDF handles the res.send() internally
     await generateQuotationPDF(quotation, res);
 
   } catch (error) {
-    console.error("🔥 Download PDF Error:", error.message);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to generate and download PDF ❌",
-      error: error.message 
-    });
+    console.error("🔥 View PDF Error:", error.message);
+    // If headers already sent, don't try to send JSON
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to generate PDF ❌",
+        error: error.message 
+      });
+    }
   }
 };
 

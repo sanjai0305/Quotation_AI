@@ -44,7 +44,16 @@ const calculatePricing = (data) => {
 // ==============================
 export const createQuotation = async (req, res) => {
   try {
-    let data = req.body;
+    // Clone the request body so we don't mutate the original directly
+    let data = { ...req.body };
+
+    // 🔥 AGGRESSIVE SANITIZATION: Remove ALL existing MongoDB hidden fields
+    // This stops the E11000 duplicate key error completely!
+    delete data._id;
+    delete data.id; // Mongoose translates 'id' back to '_id', which causes the crash!
+    delete data.__v;
+    delete data.createdAt;
+    delete data.updatedAt;
 
     // Ensure projectDetails exists
     if (!data.projectDetails) data.projectDetails = {};
@@ -67,11 +76,11 @@ export const createQuotation = async (req, res) => {
       message: "Quotation created successfully",
       // CRITICAL: We return the entire quotation object so frontend gets the _id
       data: quotation,
-      _id: quotation._id // explicitly sending _id for easier frontend access
+      _id: quotation._id // Explicitly sending _id for frontend state update
     });
 
   } catch (error) {
-    console.error("CREATE ERROR:", error);
+    console.error("🔥 CREATE ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to create quotation",
@@ -81,7 +90,7 @@ export const createQuotation = async (req, res) => {
 };
 
 // ==============================
-// 📄 GET ALL QUOTATIONS (Mapped for Table)
+// 📄 GET ALL QUOTATIONS (Mapped for Dashboard Table)
 // ==============================
 export const getAllQuotations = async (req, res) => {
   try {
@@ -103,15 +112,15 @@ export const getAllQuotations = async (req, res) => {
       };
     }
 
-    // 🔥 Fixed Query Execution Chain
+    // Fetch quotations from DB
     const quotations = await Quotation.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    // Map data so frontend table reads it easily
+    // 🔥 Map data so frontend table reads it perfectly
     const formattedQuotations = quotations.map((q) => ({
-      _id: q._id, // Raw Mongo ID
+      _id: q._id, // Raw Mongo ID for actions (Edit/Delete)
       id: q.projectDetails?.referenceNo || q._id.toString().substring(0, 8), // Clean ID for display
       client: q.projectDetails?.clientName || "Unknown Client",
       project: q.projectDetails?.projectName || "Unnamed Project",
@@ -120,14 +129,13 @@ export const getAllQuotations = async (req, res) => {
         : new Date(q.createdAt).toLocaleDateString('en-GB'),
       value: q.pricing?.grandTotal || 0,
       status: q.status || "Draft",
-      raw: q // Keeping raw data just in case frontend needs nested fields
+      raw: q // Pass raw data so "Edit" button can load it back into the form
     }));
 
-    // Send formatted array directly (as expected by standard table components)
     return res.status(200).json(formattedQuotations);
 
   } catch (error) {
-    console.error("GET ALL ERROR:", error);
+    console.error("🔥 GET ALL ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch quotations",
@@ -156,7 +164,7 @@ export const getQuotationById = async (req, res) => {
     return res.status(200).json(quotation);
 
   } catch (error) {
-    console.error("GET ONE ERROR:", error);
+    console.error("🔥 GET ONE ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Error fetching quotation",
@@ -171,14 +179,19 @@ export const getQuotationById = async (req, res) => {
 export const updateQuotation = async (req, res) => {
   try {
     const { id } = req.params;
-    let data = req.body;
+    let data = { ...req.body };
+
+    // 🔥 SANITIZE HERE TOO: Remove Mongoose specific IDs from body
+    delete data._id;
+    delete data.id;
+    delete data.__v;
 
     // 🔥 Recalculate totals in case rates/discounts were changed
     data = calculatePricing(data);
 
     const updated = await Quotation.findByIdAndUpdate(
       id,
-      data,
+      { $set: data }, // Using $set is safer for updates
       {
         new: true,
         runValidators: true,
@@ -199,7 +212,7 @@ export const updateQuotation = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("UPDATE ERROR:", error);
+    console.error("🔥 UPDATE ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Update failed",
@@ -230,7 +243,7 @@ export const deleteQuotation = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("DELETE ERROR:", error);
+    console.error("🔥 DELETE ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Delete failed",
@@ -246,7 +259,7 @@ export const getDashboardStats = async (req, res) => {
   try {
     const total = await Quotation.countDocuments();
 
-    // Sum all grandTotals
+    // Sum all grandTotals across all quotations
     const totalValueAgg = await Quotation.aggregate([
       {
         $group: {
@@ -275,7 +288,7 @@ export const getDashboardStats = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("STATS ERROR:", error);
+    console.error("🔥 STATS ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch dashboard stats",

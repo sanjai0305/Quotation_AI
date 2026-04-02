@@ -7,7 +7,6 @@ const rateItemSchema = new mongoose.Schema(
   {
     work: {
       type: String,
-      // 🔥 FIXED: Removed required: true because frontend creates new rows with "" (empty string)
       trim: true,
       default: "", 
     },
@@ -38,26 +37,10 @@ const quotationSchema = new mongoose.Schema(
     // 🏢 PROJECT DETAILS
     projectDetails: {
       companyName: { type: String, trim: true, default: "" },
-
-      clientName: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      projectName: { type: String, trim: true },
-
-      referenceNo: {
-        type: String,
-        trim: true,
-        default: null,
-      },
-
-      date: {
-        type: Date,
-        default: Date.now,
-      },
-
+      clientName: { type: String, required: true, trim: true },
+      projectName: { type: String, trim: true, default: "" },
+      referenceNo: { type: String, trim: true, default: null },
+      date: { type: Date, default: Date.now },
       paintBrand: {
         type: String,
         enum: ["Nippon Paint", "Asian Paints", "Berger Paints", "Dulux"],
@@ -67,15 +50,15 @@ const quotationSchema = new mongoose.Schema(
 
     // 📐 AREA DETAILS
     areaDetails: {
-      // 🔥 FIXED: Changed to String. If React sends "", Number type will throw a CastError.
+      // Changed to String because frontend might send "" which crashes Number types
       interiorArea: { type: String, default: "" },
       exteriorArea: { type: String, default: "" },
     },
 
     // 📝 COVER LETTER
     coverLetter: {
-      subject: { type: String, trim: true },
-      body: { type: String, trim: true },
+      subject: { type: String, trim: true, default: "" },
+      body: { type: String, trim: true, default: "" },
     },
 
     // 📊 RATE TABLE
@@ -87,33 +70,36 @@ const quotationSchema = new mongoose.Schema(
     // 💰 PRICING
     pricing: {
       subtotal: { type: Number, default: 0, min: 0 },
-
-      // 🔥 IMPORTANT: discount is % (matches frontend)
-      discount: { type: Number, default: 0, min: 0, max: 100 },
-
+      discount: { type: Number, default: 0, min: 0, max: 100 }, // % discount
       grandTotal: { type: Number, default: 0, min: 0 },
-
-      warranty: { type: Number, default: 0 },
+      warranty: { type: String, default: "" }, // Changed to string to support "3" or "3 Years"
     },
 
     // 📅 TIMELINE
     timeline: {
-      startDate: String,
-      endDate: String,
+      startDate: { type: String, default: "" },
+      endDate: { type: String, default: "" },
     },
 
     // 📄 TEXT AREAS
     textAreas: {
-      scopeOfWork: String,
-      exclusions: String,
-      termsConditions: String,
+      scopeOfWork: { type: String, default: "" },
+      exclusions: { type: String, default: "" },
+      termsConditions: { type: String, default: "" },
     },
 
     // 💳 PAYMENT TERMS
     paymentTerms: {
-      step1: String,
-      step2: String,
-      step3: String,
+      step1: { type: String, default: "" },
+      step2: { type: String, default: "" },
+      step3: { type: String, default: "" },
+    },
+
+    // 🔢 PAYMENT PERCENTS (🔥 Added to sync with frontend)
+    paymentPercents: {
+      p1: { type: String, default: "" },
+      p2: { type: String, default: "" },
+      p3: { type: String, default: "" },
     },
 
     // ⏳ VALIDITY
@@ -124,25 +110,25 @@ const quotationSchema = new mongoose.Schema(
 
     // 🏦 BANK DETAILS
     bankDetails: {
-      bankName: String,
-      accountHolder: String,
-      accountNumber: String,
-      ifscCode: String,
-      branch: String,
+      bankName: { type: String, default: "" },
+      accountHolder: { type: String, default: "" },
+      accountNumber: { type: String, default: "" },
+      ifscCode: { type: String, default: "" },
+      branch: { type: String, default: "" },
     },
 
     // ✍️ SIGNATURE
     signature: {
-      name: String,
-      designation: String,
-      phone: String,
-      email: String,
+      name: { type: String, default: "" },
+      designation: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      email: { type: String, default: "" },
     },
 
-    // 🔥 STATUS
+    // 🔥 STATUS (Added "Saved" for dashboard functionality)
     status: {
       type: String,
-      enum: ["Draft", "Sent", "Approved", "Rejected"],
+      enum: ["Draft", "Saved", "Sent", "Approved", "Rejected"],
       default: "Draft",
     },
   },
@@ -152,8 +138,9 @@ const quotationSchema = new mongoose.Schema(
 );
 
 // ==============================
-// 🔥 AUTO CALCULATIONS
+// 🔥 AUTO CALCULATIONS (Safety Net)
 // ==============================
+// Note: We already calculate this in the controller, but this ensures DB integrity
 const calculateTotals = (doc) => {
   if (!doc.rateTable?.length) return;
 
@@ -177,6 +164,7 @@ const calculateTotals = (doc) => {
   const discountPercent = Number(doc.pricing?.discount || 0);
   const discountAmount = (subtotal * discountPercent) / 100;
 
+  if (!doc.pricing) doc.pricing = {};
   doc.pricing.subtotal = subtotal;
   doc.pricing.grandTotal = Math.max(subtotal - discountAmount, 0);
 };
@@ -186,56 +174,6 @@ const calculateTotals = (doc) => {
 // ==============================
 quotationSchema.pre("save", function (next) {
   calculateTotals(this);
-  next();
-});
-
-// ==============================
-// 🔹 BEFORE UPDATE (FIXED)
-// ==============================
-quotationSchema.pre("findOneAndUpdate", function (next) {
-  let update = this.getUpdate();
-
-  if (!update) return next();
-
-  // 🔥 FIXED: Properly target the $set object so we don't mix MongoDB operators
-  let target = update.$set ? update.$set : update;
-
-  if (!target.rateTable) return next();
-
-  let subtotal = 0;
-
-  const updatedRateTable = target.rateTable.map((item) => {
-    const labour = Number(item.labour || 0);
-    const material = Number(item.material || 0);
-    const total = labour + material;
-
-    subtotal += total;
-
-    return {
-      ...item,
-      labour,
-      material,
-      total,
-    };
-  });
-
-  const discountPercent = Number(target.pricing?.discount || 0);
-  const discountAmount = (subtotal * discountPercent) / 100;
-
-  target.rateTable = updatedRateTable;
-  target.pricing = {
-    ...target.pricing,
-    subtotal,
-    grandTotal: Math.max(subtotal - discountAmount, 0),
-  };
-
-  // Set the clean update object back
-  if (update.$set) {
-    this.setUpdate({ $set: target });
-  } else {
-    this.setUpdate(target);
-  }
-
   next();
 });
 

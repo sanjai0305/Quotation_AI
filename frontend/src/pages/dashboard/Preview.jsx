@@ -5,10 +5,19 @@ import Sidebar from "./Sidebar";
 import { Edit, Printer, Download } from "lucide-react";
 
 // ==============================
-// 🔥 API SETUP (Axios)
+// 🔥 API SETUP (Axios with Token)
 // ==============================
 const API = axios.create({
   baseURL: "http://localhost:5000/api/quotations",
+});
+
+// Auto-attach token to every request (Needed for protected routes)
+API.interceptors.request.use((req) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    req.headers.Authorization = `Bearer ${token}`;
+  }
+  return req;
 });
 
 // Function to fetch quotation from backend
@@ -25,6 +34,7 @@ export default function Preview({ goBack, goToExport, goToDashboard }) {
   // ==============================
   const getDefaultData = () => ({
     projectDetails: {
+      companyLogo: "", // 🔥 Default empty logo
       companyName: "Your Company Name",
       clientName: "Client Name",
       projectName: "Project Name",
@@ -44,7 +54,8 @@ export default function Preview({ goBack, goToExport, goToDashboard }) {
       exclusions: "Structural repairs, Waterproofing, Texture finishes, Electrical work.",
       termsConditions: "Scaffolding by client. Rework charges apply. Rates based on sqft. Work order required."
     },
-    paymentTerms: { step1: "Advance (50%)", step2: "Mid Work (30%)", step3: "Completion (20%)" },
+    paymentTerms: { step1: "Advance", step2: "Mid Work", step3: "Completion" },
+    paymentPercents: { p1: "50", p2: "30", p3: "20" },
     validity: "This quotation is valid for 30 days from the date of issue.",
     bankDetails: { bankName: "HDFC Bank", accountHolder: "Company Name", accountNumber: "5020000000000", ifscCode: "HDFC0001234" },
     signature: { name: "", designation: "" }
@@ -192,13 +203,25 @@ export default function Preview({ goBack, goToExport, goToDashboard }) {
             
             {/* DOCUMENT HEADER */}
             <div className="flex justify-between items-start mb-10">
-              <div>
-                <span className="inline-flex items-center bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-xs font-semibold tracking-wide mb-4">
-                  {quotation.projectDetails?.paintBrand || "Nippon Paint"}
-                </span>
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                  {quotation.projectDetails?.companyName || "Your Company Name"}
-                </h1>
+              <div className="flex flex-col items-start gap-4">
+                
+                {/* 🔥 LOGO RENDERING HERE */}
+                {quotation.projectDetails?.companyLogo && (
+                  <img 
+                    src={quotation.projectDetails.companyLogo} 
+                    alt="Company Logo" 
+                    className="h-16 max-wxs object-contain" 
+                  />
+                )}
+
+                <div>
+                  <span className="inline-flex items-center bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-xs font-semibold tracking-wide mb-2">
+                    {quotation.projectDetails?.paintBrand || "Nippon Paint"}
+                  </span>
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight mt-1">
+                    {quotation.projectDetails?.companyName || "Your Company Name"}
+                  </h1>
+                </div>
               </div>
 
               <div className="text-right">
@@ -362,12 +385,29 @@ export default function Preview({ goBack, goToExport, goToDashboard }) {
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-500">
                       <th className="py-2 text-left font-semibold">Stage</th>
+                      <th className="py-2 text-right font-semibold">Percentage</th>
                     </tr>
                   </thead>
                   <tbody className="text-gray-700">
-                    {quotation.paymentTerms?.step1 && <tr className="border-b border-gray-100"><td className="py-2.5">{quotation.paymentTerms.step1}</td></tr>}
-                    {quotation.paymentTerms?.step2 && <tr className="border-b border-gray-100"><td className="py-2.5">{quotation.paymentTerms.step2}</td></tr>}
-                    {quotation.paymentTerms?.step3 && <tr><td className="py-2.5">{quotation.paymentTerms.step3}</td></tr>}
+                    {/* 🔥 ENHANCED: Showing percentages here too! */}
+                    {quotation.paymentTerms?.step1 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="py-2.5">{quotation.paymentTerms.step1}</td>
+                        <td className="py-2.5 text-right font-bold">{quotation.paymentPercents?.p1 ? `${quotation.paymentPercents.p1}%` : "-"}</td>
+                      </tr>
+                    )}
+                    {quotation.paymentTerms?.step2 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="py-2.5">{quotation.paymentTerms.step2}</td>
+                        <td className="py-2.5 text-right font-bold">{quotation.paymentPercents?.p2 ? `${quotation.paymentPercents.p2}%` : "-"}</td>
+                      </tr>
+                    )}
+                    {quotation.paymentTerms?.step3 && (
+                      <tr>
+                        <td className="py-2.5">{quotation.paymentTerms.step3}</td>
+                        <td className="py-2.5 text-right font-bold">{quotation.paymentPercents?.p3 ? `${quotation.paymentPercents.p3}%` : "-"}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

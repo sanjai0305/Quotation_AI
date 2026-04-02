@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // 🔐 AUTH PAGES
 import Login from "./pages/auth/Login";
@@ -13,17 +13,43 @@ import Export from "./pages/dashboard/Export";
 import Settings from "./pages/dashboard/Settings";
 
 function App() {
-  // Global state for simple routing
+  // Global state for routing
   const [page, setPage] = useState("login");
-  
-  // 🔥 THE MAGIC STATE: Stores the ID of the saved quotation
   const [quotationId, setQuotationId] = useState(null);
 
-  // Navigation Handlers (Passed to Sidebar & Buttons)
+  // ==========================================
+  // 🔥 URL ROUTING LOGIC (Deep Linking)
+  // ==========================================
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const path = window.location.pathname; // Gets "/preview/69cd..."
+
+    // 1. Check if the user is trying to access a PUBLIC Preview link
+    if (path.startsWith("/preview/")) {
+      const idFromUrl = path.split("/")[2]; // Extracts the ID from URL
+      if (idFromUrl && idFromUrl.length === 24) {
+        setQuotationId(idFromUrl);
+        setPage("preview");
+        return; // Don't proceed to auth checks
+      }
+    }
+
+    // 2. Standard Auth Check for other pages
+    if (token) {
+      setPage("dashboard");
+    } else {
+      setPage("login");
+    }
+  }, []);
+
+  // Navigation Handlers
   const navProps = {
-    goToDashboard: () => setPage("dashboard"),
+    goToDashboard: () => {
+      window.history.pushState({}, "", "/dashboard"); // Sync URL
+      setPage("dashboard");
+    },
     goToCreate: () => {
-      setQuotationId(null); // Reset ID when creating a new quote
+      window.history.pushState({}, "", "/create");
       setPage("create");
     },
     goToPreview: () => setPage("preview"),
@@ -61,7 +87,7 @@ function App() {
       {page === "dashboard" && (
         <Dashboard 
           {...navProps} 
-          setQuotationId={setQuotationId} // Useful if you click a saved quote from the table
+          setQuotationId={setQuotationId} 
         />
       )}
 
@@ -69,7 +95,8 @@ function App() {
         <CreateQuotation 
           {...navProps} 
           goBack={navProps.goToDashboard} 
-          setQuotationId={setQuotationId} // 🔥 Extracts the ID after clicking "Save"
+          setQuotationId={setQuotationId} 
+          quotationId={quotationId} 
         />
       )}
 
@@ -77,7 +104,7 @@ function App() {
         <Preview 
           {...navProps} 
           goBack={navProps.goToCreate}
-          quotationId={quotationId} // Passes ID so preview knows if it's saved or a draft
+          quotationId={quotationId} // ID set from URL will be passed here
         />
       )}
 
@@ -85,7 +112,7 @@ function App() {
         <Export 
           {...navProps} 
           goBack={navProps.goToPreview} 
-          quotationId={quotationId} // 🔥 Enables the PDF and Email buttons!
+          quotationId={quotationId} 
         />
       )}
 
