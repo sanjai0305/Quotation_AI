@@ -1,9 +1,8 @@
 import User from "../models/User.js";
-import bcrypt from "bcryptjs";
+import Quotation from "../models/Quotation.js";
 import generateOtp, { getOtpExpiry } from "../utils/generateOtp.js";
 import sendEmail from "../utils/sendEmail.js";
 import generateToken from "../utils/generateToken.js";
-
 
 // ==============================
 // 🔐 REGISTER + SEND OTP
@@ -24,20 +23,35 @@ export const registerUser = async (req, res) => {
 
     const otp = generateOtp();
     const expiry = getOtpExpiry(5);
-    const hashed = await bcrypt.hash(password, 10);
+
+    // 🚀 --- TRIAL EXPIRY LOGIC (NEW) --- 🚀
+    const currentDate = new Date();
+    const cutoffDate = new Date("2026-06-01T00:00:00Z"); // ஜூன் 1, 2026-க்கு முன்னாடி
+    
+    let trialDays = 10; // Default ah 10 நாட்கள் (ஜூன் 1-க்கு பிறகு வருபவர்களுக்கு)
+    if (currentDate < cutoffDate) {
+      trialDays = 90; // மே 31 அல்லது அதற்கு முன் வருபவர்களுக்கு 90 நாட்கள்
+    }
+
+    const trialExpiresAt = new Date(currentDate);
+    trialExpiresAt.setDate(trialExpiresAt.getDate() + trialDays);
+    // -------------------------------------
 
     if (!user) {
       user = new User({
         name,
         mobile,
         email,
-        password: hashed,
+        password, 
         otp,
         otpExpires: expiry,
+        trialExpiresAt: trialExpiresAt, // 👈 Save the calculated expiry date
       });
     } else {
       user.otp = otp;
       user.otpExpires = expiry;
+      user.password = password; 
+      user.trialExpiresAt = trialExpiresAt; // Update if they are re-registering before verification
     }
 
     await user.save();
@@ -51,22 +65,30 @@ export const registerUser = async (req, res) => {
   }
 };
 
-
 // ==============================
-// 🔐 VERIFY REGISTER OTP
+// 🔑 VERIFY REGISTER OTP
 // ==============================
 export const verifyOtp = async (req, res) => {
-  const { email, otp } = req.body;
-
   try {
-    const user = await User.findOne({ email });
+    const { email, otp } = req.body;
 
-    if (
-      !user ||
-      user.otp !== otp ||
-      user.otpExpires < Date.now()
-    ) {
-      return res.status(400).json({ message: "Invalid OTP ❌" });
+    // 🔥 Safety Check: Remove any spaces if coming from frontend
+    const cleanOtp = otp ? otp.toString().replace(/\s/g, "") : "";
+
+    const user = await User.findOne({ email }).select("+otp +otpExpires");
+
+    // 🔍 DEBUG: Check this in your VS Code Terminal
+    console.log("--- OTP VERIFICATION ---");
+    console.log("Email:", email);
+    console.log("Received OTP (Clean):", `|${cleanOtp}|`);
+    console.log("DB Stored OTP:", `|${user?.otp}|`);
+    console.log("------------------------");
+
+    if (!user || user.otp !== cleanOtp || user.otpExpires < Date.now()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid or expired OTP ❌" 
+      });
     }
 
     user.isVerified = true;
@@ -76,8 +98,10 @@ export const verifyOtp = async (req, res) => {
     await user.save();
 
     res.json({
+      success: true,
       token: generateToken(user._id),
-      name: user.name,
+      user: user, 
+      message: "Verification successful",
     });
 
   } catch (err) {
@@ -86,6 +110,37 @@ export const verifyOtp = async (req, res) => {
   }
 };
 
+// ==============================
+// 🔁 RESEND OTP
+// ==============================
+export const resendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const otp = generateOtp();
+    user.otp = otp;
+    user.otpExpires = getOtpExpiry(5);
+
+    await user.save();
+    await sendEmail(email, otp);
+
+    res.json({ success: true, message: "New OTP sent successfully! 📩" });
+
+  } catch (err) {
+    console.error("Resend OTP Error:", err.message);
+    res.status(500).json({ message: "Failed to resend OTP" });
+  }
+};
 
 // ==============================
 // 🔐 LOGIN
@@ -97,22 +152,19 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ email }).select("+password");
 
     if (!user || !user.isVerified) {
-      return res.status(401).json({
-        message: "Verify account first",
-      });
+      return res.status(401).json({ message: "Verify account first" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.matchPassword(password);
 
     if (!isMatch) {
-      return res.status(401).json({
-        message: "Invalid credentials ❌",
-      });
+      return res.status(401).json({ message: "Invalid credentials ❌" });
     }
 
     res.json({
       token: generateToken(user._id),
-      name: user.name,
+      user: user, 
+      message: "Login successful",
     });
 
   } catch (err) {
@@ -121,31 +173,19 @@ export const loginUser = async (req, res) => {
   }
 };
 
-
 // ==============================
-// 🔁 FORGOT PASSWORD (SEND OTP)
+// 🔁 FORGOT PASSWORD
 // ==============================
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
-    if (!email) {
-      return res.status(400).json({ message: "Email required" });
-    }
-
     const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.json({
-        message: "If email exists, OTP sent",
-      });
-    }
+    if (!user) return res.json({ message: "If email exists, OTP sent" });
 
     const otp = generateOtp();
-    const expiry = getOtpExpiry(5);
-
     user.otp = otp;
-    user.otpExpires = expiry;
+    user.otpExpires = getOtpExpiry(5);
 
     await user.save();
     await sendEmail(email, otp);
@@ -153,11 +193,9 @@ export const forgotPassword = async (req, res) => {
     res.json({ message: "OTP sent successfully" });
 
   } catch (err) {
-    console.error("Forgot Error:", err.message);
     res.status(500).json({ message: "Failed to send OTP" });
   }
 };
-
 
 // ==============================
 // 🔁 RESET PASSWORD
@@ -166,39 +204,87 @@ export const resetPassword = async (req, res) => {
   const { email, otp, newPassword } = req.body;
 
   try {
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({ message: "All fields required" });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Min 6 chars required" });
-    }
-
     const user = await User.findOne({ email });
-
-    const valid =
-      user &&
-      user.otp === otp &&
-      user.otpExpires > Date.now();
+    const cleanOtp = otp ? otp.toString().replace(/\s/g, "") : "";
+    
+    const valid = user && user.otp === cleanOtp && user.otpExpires > Date.now();
 
     if (!valid) {
-      return res.status(400).json({
-        message: "Invalid or expired OTP ❌",
-      });
+      return res.status(400).json({ message: "Invalid or expired OTP ❌" });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = newPassword; 
     user.otp = null;
     user.otpExpires = null;
-
     await user.save();
 
-    res.json({
-      message: "Password reset successful 🎉",
+    res.json({ message: "Password reset successful 🎉" });
+
+  } catch (err) {
+    res.status(500).json({ message: "Reset failed" });
+  }
+};
+
+// ==============================
+// 🧑‍💻 UPDATE USER PROFILE
+// ==============================
+export const updateUserProfile = async (req, res) => {
+  try {
+    const { name, mobile, designation, location, bio } = req.body;
+    const userId = req.user._id; 
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    user.name = name || user.name;
+    user.mobile = mobile || user.mobile;
+    user.designation = designation !== undefined ? designation : user.designation;
+    user.location = location !== undefined ? location : user.location;
+    user.bio = bio !== undefined ? bio : user.bio;
+
+    if (req.file) {
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      user.profilePic = `${baseUrl}/uploads/profiles/${req.file.filename}`;
+    }
+
+    const updatedUser = await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully!",
+      user: updatedUser,
     });
 
   } catch (err) {
-    console.error("Reset Error:", err.message);
-    res.status(500).json({ message: "Reset failed" });
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+// ==============================
+// 🚨 DELETE USER ACCOUNT (DANGER)
+// ==============================
+export const deleteUserAccount = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+
+    // 1. Delete all quotations associated with this user
+    await Quotation.deleteMany({ user: userId });
+
+    // 2. Delete the user document itself
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Account and all associated data deleted successfully.",
+    });
+  } catch (error) {
+    console.error("Delete Account Error:", error.message);
+    res.status(500).json({ success: false, message: "Server error during account deletion" });
   }
 };

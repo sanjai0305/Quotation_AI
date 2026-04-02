@@ -33,10 +33,15 @@ export const deleteQuotation = (id) => API.delete(`/${id}`);
 // 📊 DASHBOARD COMPONENT
 // ==============================
 export default function Dashboard({
+  user, // 🔥 Received from App.jsx
   goToCreate,
   goToDashboard,
   goToPreview,
   goToExport,
+  goToSubscription, 
+  goToSettings, // 🔥 NEW: Added for Sidebar
+  goToHelp,     // 🔥 NEW: Added for Sidebar
+  goToEditProfile, 
   setQuotationId 
 }) {
   const [stats, setStats] = useState({ total: 0, value: 0, lastCreated: "None" });
@@ -165,8 +170,18 @@ export default function Dashboard({
       )}
 
       <div className="fixed top-0 left-0 h-screen w-[250px] z-30 shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-gray-100">
-        {/* Pass handleStartNewQuote to Sidebar instead of generic goToCreate if Sidebar has a New Quote button */}
-        <Sidebar active="dashboard" goToCreate={handleStartNewQuote} goToDashboard={goToDashboard} goToPreview={goToPreview} goToExport={goToExport} />
+        <Sidebar 
+          active="dashboard" 
+          user={user} 
+          goToCreate={handleStartNewQuote} 
+          goToDashboard={goToDashboard} 
+          goToPreview={goToPreview} 
+          goToExport={goToExport} 
+          goToSubscription={goToSubscription}
+          goToSettings={goToSettings} // 🔥 PERFECTLY PASSED
+          goToHelp={goToHelp}         // 🔥 PERFECTLY PASSED
+          goToEditProfile={goToEditProfile} 
+        />
       </div>
 
       <div className="ml-[250px] h-screen flex flex-col relative">

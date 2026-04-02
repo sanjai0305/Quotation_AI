@@ -16,13 +16,17 @@ import {
 } from "lucide-react";
 
 export default function Export({
+  user, 
   goBack,
   goToDashboard,
   goToCreate,
   goToPreview,
   goToExport,
-  goToSettings,
-  quotationId, // ✅ Received from App.jsx after Save/Edit
+  goToSubscription, 
+  goToSettings,     // 🔥 NEW: Added Settings Prop
+  goToHelp,         // 🔥 NEW: Added Help Prop
+  goToEditProfile, 
+  quotationId, 
 }) {
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [isSending, setIsSending] = useState(false);
@@ -44,7 +48,6 @@ export default function Export({
     if (!quotationId) {
       return showToast("Please Save the quotation first! ❌", "error");
     }
-    // 🚨 Using backticks (`) ensures quotationId is injected correctly
     window.open(`http://localhost:5000/api/export/pdf/${quotationId}?token=${token}`, "_blank");
   };
 
@@ -88,8 +91,6 @@ export default function Export({
   const copyShareLink = () => {
     if (!quotationId) return;
     
-    // 🚨 Frontend URL: Client will see the design here. 
-    // Preview.jsx will handle public fetching.
     const link = `${window.location.origin}/preview/${quotationId}`;
     
     navigator.clipboard.writeText(link);
@@ -97,16 +98,50 @@ export default function Export({
   };
 
   // ==============================
-  // 📲 WHATSAPP SHARE
+  // 📲 SHARE ACTUAL PDF FILE (Mobile / Web Share API)
   // ==============================
-  const handleWhatsApp = () => {
+  const handleSharePDF = async () => {
     if (!quotationId) return showToast("Save first! ❌", "error");
-    
-    const link = `${window.location.origin}/preview/${quotationId}`;
-    const text = `Hello! Please find your Quotation below:\n\n🔗 View Online: ${link}\n\nLet us know if you have any questions!`;
-      
-    const msg = encodeURIComponent(text);
-    window.open(`https://wa.me/?text=${msg}`, "_blank");
+
+    try {
+      showToast("Preparing PDF for sharing... ⏳", "success");
+
+      // 1. Fetch PDF Blob from Backend
+      const response = await axios.get(
+        `http://localhost:5000/api/export/pdf/${quotationId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob', // 🔥 Important for downloading files
+        }
+      );
+
+      // 2. Convert Blob to an actual File Object
+      const file = new File([response.data], `Quotation_${quotationId.substring(0, 6)}.pdf`, {
+        type: 'application/pdf',
+      });
+
+      // 3. Check if the device supports sharing Files (Mobile devices mostly do)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Your Quotation',
+          text: 'Hello! Please find your professional quotation attached below. Let us know if you have any questions.',
+        });
+        showToast("✅ Shared successfully!", "success");
+      } else {
+        // 🔥 FALLBACK FOR DESKTOP (Sends the Web Link via WhatsApp)
+        showToast("File sharing not supported, sending link... 🔗", "success");
+        const link = `${window.location.origin}/preview/${quotationId}`;
+        const text = `Hello! 👋\n\nThank you for choosing our services. Please find the link to view and download your professional quotation below:\n\n📄 *Quotation Document:*\n🔗 ${link}\n\nIf you have any questions or need further clarification, feel free to reply to this message.\n\nBest Regards.`;
+        const msg = encodeURIComponent(text);
+        window.open(`https://wa.me/?text=${msg}`, "_blank");
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') { // Ignore if the user just closed the share menu
+        console.error("Share Error:", error);
+        showToast("❌ Could not share file directly.", "error");
+      }
+    }
   };
 
   return (
@@ -122,7 +157,18 @@ export default function Export({
 
       {/* SIDEBAR */}
       <div className="fixed top-0 left-0 h-screen w-[250px] z-30 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        <Sidebar active="export" goToDashboard={goToDashboard} goToCreate={goToCreate} goToPreview={goToPreview} goToExport={goToExport} goToSettings={goToSettings} />
+        <Sidebar 
+          active="export" 
+          user={user} 
+          goToDashboard={goToDashboard} 
+          goToCreate={goToCreate} 
+          goToPreview={goToPreview} 
+          goToExport={goToExport} 
+          goToSubscription={goToSubscription} 
+          goToSettings={goToSettings} // 🔥 PERFECTLY PASSED
+          goToHelp={goToHelp}         // 🔥 PERFECTLY PASSED
+          goToEditProfile={goToEditProfile} 
+        />
       </div>
 
       {/* MAIN CONTENT */}
@@ -174,8 +220,16 @@ export default function Export({
             <div className="space-y-4">
               <ActionCard icon={<Download className="w-6 h-6" />} title="Download as PDF" desc="Generate a professional PDF file — ready to send" onClick={handleDownloadPDF} disabled={!quotationId} />
               <ActionCard icon={<Printer className="w-6 h-6" />} title="Print Quotation" desc="Send directly to your local printer" onClick={() => window.print()} disabled={false} />
-              <ActionCard icon={<Share2 className="w-6 h-6" />} title="Share with PDF Link" desc="Copy a direct link for client review" onClick={copyShareLink} disabled={!quotationId} />
-              <ActionCard icon={<MessageCircle className="w-6 h-6" />} title="Share via WhatsApp" desc="Send a professional link to WhatsApp" onClick={handleWhatsApp} disabled={!quotationId} />
+              <ActionCard icon={<Share2 className="w-6 h-6" />} title="Share with Link" desc="Copy a direct link for client review" onClick={copyShareLink} disabled={!quotationId} />
+              
+              <ActionCard 
+                icon={<MessageCircle className="w-6 h-6" />} 
+                title="Share Document (WhatsApp/Mobile)" 
+                desc="Send the actual PDF document directly via your apps" 
+                onClick={handleSharePDF} 
+                disabled={!quotationId} 
+              />
+              
               <ActionCard icon={<Mail className="w-6 h-6" />} title={isSending ? "Sending Email..." : "Share via Email"} desc="Send the PDF directly to client's inbox" onClick={handleSendEmail} disabled={!quotationId || isSending} isSending={isSending} />
             </div>
           </div>

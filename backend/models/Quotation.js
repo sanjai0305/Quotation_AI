@@ -34,8 +34,16 @@ const rateItemSchema = new mongoose.Schema(
 // ==============================
 const quotationSchema = new mongoose.Schema(
   {
+    // 🔥 ADDED: LINK QUOTATION TO THE LOGGED-IN USER
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
     // 🏢 PROJECT DETAILS
     projectDetails: {
+      companyLogo: { type: String, default: "" }, // 🔥 ADDED: TO SAVE LOGO IN DATABASE
       companyName: { type: String, trim: true, default: "" },
       clientName: { type: String, required: true, trim: true },
       projectName: { type: String, trim: true, default: "" },
@@ -95,7 +103,7 @@ const quotationSchema = new mongoose.Schema(
       step3: { type: String, default: "" },
     },
 
-    // 🔢 PAYMENT PERCENTS (🔥 Added to sync with frontend)
+    // 🔢 PAYMENT PERCENTS
     paymentPercents: {
       p1: { type: String, default: "" },
       p2: { type: String, default: "" },
@@ -125,7 +133,7 @@ const quotationSchema = new mongoose.Schema(
       email: { type: String, default: "" },
     },
 
-    // 🔥 STATUS (Added "Saved" for dashboard functionality)
+    // 🔥 STATUS
     status: {
       type: String,
       enum: ["Draft", "Saved", "Sent", "Approved", "Rejected"],
@@ -180,6 +188,9 @@ quotationSchema.pre("save", function (next) {
 // ==============================
 // 🔍 INDEXES
 // ==============================
+
+// 🔥 FAST QUERY: Index for getting user's specific quotations quickly
+quotationSchema.index({ user: 1 });
 
 // 🔎 Text search
 quotationSchema.index({

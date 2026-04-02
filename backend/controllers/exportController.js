@@ -11,24 +11,26 @@ import { sendQuotationEmail } from "../services/emailService.js";
 export const downloadPDF = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id || req.user.id; // 🔥 Data Isolation Security
 
-    // 1. Find the quotation in the database
-    const quotation = await Quotation.findById(id);
+    // 1. Find the quotation in the database (Only if it belongs to the logged-in user)
+    const quotation = await Quotation.findOne({ _id: id, user: userId });
 
     if (!quotation) {
       return res.status(404).json({ 
         success: false, 
-        message: "Quotation not found ❌" 
+        message: "Quotation not found or you don't have permission to view it ❌" 
       });
     }
 
     // 🔥 SET HEADERS FOR INLINE VIEWING
-    // Ithu thaan PDF-ah browser tab-la open panna vekkum
+    // 'inline' னு கொடுத்தா Browser-லயே PDF ஓபன் ஆகும். (Download ஆகணும்னா 'attachment' னு மாத்திக்கலாம்)
+    const fileName = quotation.projectDetails?.referenceNo 
+      ? `Quotation_${quotation.projectDetails.referenceNo.replace(/\s+/g, '_')}.pdf` 
+      : 'Quotation_Draft.pdf';
+
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="Quotation_${quotation.projectDetails?.referenceNo || 'Draft'}.pdf"`
-    );
+    res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
 
     // 2. Generate PDF and send directly as response stream
     // Note: generateQuotationPDF handles the res.send() internally
@@ -56,6 +58,7 @@ export const downloadPDF = async (req, res) => {
 export const sendEmail = async (req, res) => {
   try {
     const { quotationId, email } = req.body;
+    const userId = req.user._id || req.user.id; // 🔥 Data Isolation Security
 
     // 1. Validate inputs
     if (!quotationId || !email) {
@@ -65,13 +68,13 @@ export const sendEmail = async (req, res) => {
       });
     }
 
-    // 2. Fetch the quotation from DB
-    const quotation = await Quotation.findById(quotationId);
+    // 2. Fetch the quotation from DB (Only if it belongs to the logged-in user)
+    const quotation = await Quotation.findOne({ _id: quotationId, user: userId });
 
     if (!quotation) {
       return res.status(404).json({ 
         success: false, 
-        message: "Quotation not found in database ❌" 
+        message: "Quotation not found in database or unauthorized ❌" 
       });
     }
 

@@ -44,29 +44,30 @@ const calculatePricing = (data) => {
 // ==============================
 export const createQuotation = async (req, res) => {
   try {
-    // Clone the request body so we don't mutate the original directly
     let data = { ...req.body };
 
-    // 🔥 AGGRESSIVE SANITIZATION: Remove ALL existing MongoDB hidden fields
-    // This stops the E11000 duplicate key error completely!
+    // 🔥 AGGRESSIVE SANITIZATION
     delete data._id;
-    delete data.id; // Mongoose translates 'id' back to '_id', which causes the crash!
+    delete data.id; 
     delete data.__v;
     delete data.createdAt;
     delete data.updatedAt;
 
+    // 🔥 SECURE: Link this quotation to the logged-in user!
+    data.user = req.user._id || req.user.id;
+
     // Ensure projectDetails exists
     if (!data.projectDetails) data.projectDetails = {};
 
-    // 🔥 Generate Reference Number (e.g., QTN-2026-001)
+    // Generate Reference Number
     if (!data.projectDetails.referenceNo) {
       data.projectDetails.referenceNo = generateQuotationId();
     }
 
-    // 🔥 Calculate accurate totals before saving
+    // Calculate accurate totals before saving
     data = calculatePricing(data);
 
-    // Default status to Draft if not provided
+    // Default status
     data.status = data.status || "Draft";
 
     const quotation = await Quotation.create(data);
@@ -74,9 +75,8 @@ export const createQuotation = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Quotation created successfully",
-      // CRITICAL: We return the entire quotation object so frontend gets the _id
       data: quotation,
-      _id: quotation._id // Explicitly sending _id for frontend state update
+      _id: quotation._id 
     });
 
   } catch (error) {
@@ -94,34 +94,32 @@ export const createQuotation = async (req, res) => {
 // ==============================
 export const getAllQuotations = async (req, res) => {
   try {
-    // Pagination & Search query from request
     const skip = parseInt(req.query.skip) || 0;
     const limit = parseInt(req.query.limit) || 50;
     const search = req.query.search || "";
+    
+    const userId = req.user._id || req.user.id;
 
-    let query = {};
+    // 🔥 SECURE: Only fetch documents matching the logged-in user
+    let query = { user: userId };
 
-    // 🔥 Search Logic (Case-insensitive Regex)
+    // Search Logic
     if (search) {
-      query = {
-        $or: [
-          { "projectDetails.clientName": { $regex: search, $options: "i" } },
-          { "projectDetails.projectName": { $regex: search, $options: "i" } },
-          { "projectDetails.referenceNo": { $regex: search, $options: "i" } },
-        ],
-      };
+      query.$or = [
+        { "projectDetails.clientName": { $regex: search, $options: "i" } },
+        { "projectDetails.projectName": { $regex: search, $options: "i" } },
+        { "projectDetails.referenceNo": { $regex: search, $options: "i" } },
+      ];
     }
 
-    // Fetch quotations from DB
     const quotations = await Quotation.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    // 🔥 Map data so frontend table reads it perfectly
     const formattedQuotations = quotations.map((q) => ({
-      _id: q._id, // Raw Mongo ID for actions (Edit/Delete)
-      id: q.projectDetails?.referenceNo || q._id.toString().substring(0, 8), // Clean ID for display
+      _id: q._id, 
+      id: q.projectDetails?.referenceNo || q._id.toString().substring(0, 8), 
       client: q.projectDetails?.clientName || "Unknown Client",
       project: q.projectDetails?.projectName || "Unnamed Project",
       date: q.projectDetails?.date 
@@ -129,7 +127,7 @@ export const getAllQuotations = async (req, res) => {
         : new Date(q.createdAt).toLocaleDateString('en-GB'),
       value: q.pricing?.grandTotal || 0,
       status: q.status || "Draft",
-      raw: q // Pass raw data so "Edit" button can load it back into the form
+      raw: q 
     }));
 
     return res.status(200).json(formattedQuotations);
@@ -150,17 +148,18 @@ export const getAllQuotations = async (req, res) => {
 export const getQuotationById = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id || req.user.id;
 
-    const quotation = await Quotation.findById(id);
+    // 🔥 SECURE: Ensure the quotation belongs to the user
+    const quotation = await Quotation.findOne({ _id: id, user: userId });
 
     if (!quotation) {
       return res.status(404).json({
         success: false,
-        message: "Quotation not found",
+        message: "Quotation not found or you don't have permission to view it.",
       });
     }
 
-    // Return the full raw document for the Preview screen
     return res.status(200).json(quotation);
 
   } catch (error) {
@@ -179,29 +178,28 @@ export const getQuotationById = async (req, res) => {
 export const updateQuotation = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id || req.user.id;
     let data = { ...req.body };
 
-    // 🔥 SANITIZE HERE TOO: Remove Mongoose specific IDs from body
+    // SANITIZE
     delete data._id;
     delete data.id;
     delete data.__v;
+    delete data.user; // Prevent changing the owner
 
-    // 🔥 Recalculate totals in case rates/discounts were changed
     data = calculatePricing(data);
 
-    const updated = await Quotation.findByIdAndUpdate(
-      id,
-      { $set: data }, // Using $set is safer for updates
-      {
-        new: true,
-        runValidators: true,
-      }
+    // 🔥 SECURE: findOneAndUpdate ensures we only update if it belongs to this user
+    const updated = await Quotation.findOneAndUpdate(
+      { _id: id, user: userId }, 
+      { $set: data }, 
+      { new: true, runValidators: true }
     );
 
     if (!updated) {
       return res.status(404).json({
         success: false,
-        message: "Quotation not found",
+        message: "Quotation not found or unauthorized",
       });
     }
 
@@ -227,13 +225,15 @@ export const updateQuotation = async (req, res) => {
 export const deleteQuotation = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id || req.user.id;
 
-    const deleted = await Quotation.findByIdAndDelete(id);
+    // 🔥 SECURE: Only allow delete if the user owns it
+    const deleted = await Quotation.findOneAndDelete({ _id: id, user: userId });
 
     if (!deleted) {
       return res.status(404).json({
         success: false,
-        message: "Quotation not found",
+        message: "Quotation not found or unauthorized",
       });
     }
 
@@ -257,24 +257,22 @@ export const deleteQuotation = async (req, res) => {
 // ==============================
 export const getDashboardStats = async (req, res) => {
   try {
-    const total = await Quotation.countDocuments();
+    const userId = req.user._id || req.user.id;
 
-    // Sum all grandTotals across all quotations
+    // 🔥 SECURE: Count only this user's quotations
+    const total = await Quotation.countDocuments({ user: userId });
+
+    // 🔥 SECURE: Sum only this user's values
     const totalValueAgg = await Quotation.aggregate([
-      {
-        $group: {
-          _id: null,
-          value: { $sum: "$pricing.grandTotal" },
-        },
-      },
+      { $match: { user: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: null, value: { $sum: "$pricing.grandTotal" } } },
     ]);
 
     const value = totalValueAgg[0]?.value || 0;
 
-    // Find the most recent quotation date
-    const lastQuotation = await Quotation.findOne().sort({ createdAt: -1 });
+    // 🔥 SECURE: Get only this user's most recent quotation
+    const lastQuotation = await Quotation.findOne({ user: userId }).sort({ createdAt: -1 });
     
-    // Format "Today, 10:30 AM" or raw date
     const lastCreated = lastQuotation
       ? new Date(lastQuotation.createdAt).toLocaleString('en-IN', { 
           month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 

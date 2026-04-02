@@ -10,117 +10,189 @@ import Dashboard from "./pages/dashboard/Dashboard";
 import CreateQuotation from "./pages/dashboard/CreateQuotation";
 import Preview from "./pages/dashboard/Preview";
 import Export from "./pages/dashboard/Export";
-import Settings from "./pages/dashboard/Settings";
+import EditProfile from "./pages/dashboard/EditProfile"; 
 
-function App() {
-  // Global state for routing
-  const [page, setPage] = useState("login");
+// 🔥 SETTINGS & HELP PAGES
+import Settings from "./pages/dashboard/Settings";
+import HelpSupport from "./pages/dashboard/HelpSupport";
+
+// 🔥 MASTER SUBSCRIPTION PAGE
+import Subscription from "./pages/dashboard/Subscription";
+
+export default function App() {
+  const [page, setPage] = useState("loading");
   const [quotationId, setQuotationId] = useState(null);
+  const [user, setUser] = useState(null); 
 
   // ==========================================
-  // 🔥 URL ROUTING LOGIC (Deep Linking)
+  // 🔥 URL ROUTING & AUTH CHECK
   // ==========================================
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const path = window.location.pathname; // Gets "/preview/69cd..."
+    const storedUser = localStorage.getItem("user"); 
+    const path = window.location.pathname;
 
-    // 1. Check if the user is trying to access a PUBLIC Preview link
-    if (path.startsWith("/preview/")) {
-      const idFromUrl = path.split("/")[2]; // Extracts the ID from URL
-      if (idFromUrl && idFromUrl.length === 24) {
-        setQuotationId(idFromUrl);
-        setPage("preview");
-        return; // Don't proceed to auth checks
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Failed to parse user data");
+        localStorage.removeItem("user");
       }
     }
 
-    // 2. Standard Auth Check for other pages
+    // 1. PUBLIC Preview Link Check
+    if (path.startsWith("/preview/")) {
+      const idFromUrl = path.split("/")[2]; 
+      if (idFromUrl && idFromUrl.length === 24) {
+        setQuotationId(idFromUrl);
+        setPage("preview");
+        return; 
+      }
+    }
+
+    // 2. Standard Auth Check
     if (token) {
-      setPage("dashboard");
+      if (path.includes("/subscription")) setPage("subscription");
+      else if (path.includes("/edit-profile")) setPage("edit-profile");
+      else if (path.includes("/settings")) setPage("settings");
+      else if (path.includes("/help")) setPage("help");
+      else if (path.includes("/create")) setPage("create");
+      else if (path.includes("/preview")) setPage("preview"); 
+      else if (path.includes("/export")) setPage("export");
+      else setPage("dashboard");
     } else {
       setPage("login");
     }
   }, []);
 
-  // Navigation Handlers
+  // ==========================================
+  // 🧭 NAVIGATION HANDLERS
+  // ==========================================
   const navProps = {
     goToDashboard: () => {
-      window.history.pushState({}, "", "/dashboard"); // Sync URL
+      window.history.pushState({}, "", "/dashboard"); 
       setPage("dashboard");
     },
+
     goToCreate: () => {
-      window.history.pushState({}, "", "/create");
-      setPage("create");
+      const now = new Date();
+      const trialDate = user?.trialExpiresAt ? new Date(user.trialExpiresAt) : null;
+      const isSubscribed = user?.isSubscribed;
+      const isTrialUsedBefore = user?.isTrialUsed; 
+
+      if (isSubscribed) {
+        window.history.pushState({}, "", "/create");
+        setPage("create");
+      } 
+      else if (isTrialUsedBefore) {
+        alert("Trial limit reached! 🚨 Please subscribe to continue.");
+        window.history.pushState({}, "", "/subscription");
+        setPage("subscription");
+      }
+      else if (trialDate && trialDate < now) {
+        alert("Trial period expired! ⏳ Please subscribe to continue.");
+        window.history.pushState({}, "", "/subscription");
+        setPage("subscription");
+      } 
+      else {
+        window.history.pushState({}, "", "/create");
+        setPage("create");
+      }
     },
-    goToPreview: () => setPage("preview"),
-    goToExport: () => setPage("export"),
-    goToSettings: () => setPage("settings"),
+
+    goToPreview: () => {
+      window.history.pushState({}, "", "/preview");
+      setPage("preview");
+    },
+
+    goToExport: () => {
+      window.history.pushState({}, "", "/export");
+      setPage("export");
+    },
+
+    goToSubscription: () => { 
+      window.history.pushState({}, "", "/subscription");
+      setPage("subscription");
+    },
+
+    goToEditProfile: () => { 
+      window.history.pushState({}, "", "/edit-profile");
+      setPage("edit-profile");
+    },
+
+    goToSettings: () => { 
+      window.history.pushState({}, "", "/settings");
+      setPage("settings");
+    },
+
+    goToHelp: () => { 
+      window.history.pushState({}, "", "/help");
+      setPage("help");
+    }
   };
+
+  if (page === "loading") return null; 
 
   return (
     <>
-      {/* =========================================
-          🔐 AUTHENTICATION ROUTES
-      ========================================= */}
-      
+      {/* 🔐 AUTHENTICATION */}
       {page === "login" && (
         <Login
           goToRegister={() => setPage("register")}
           goToForgot={() => setPage("forgot")}
-          goToDashboard={navProps.goToDashboard}
+          goToDashboard={() => {
+            const loggedInUser = localStorage.getItem("user");
+            if(loggedInUser) setUser(JSON.parse(loggedInUser));
+            navProps.goToDashboard();
+          }}
         />
       )}
 
-      {page === "register" && (
-        <Register goToLogin={() => setPage("login")} />
-      )}
+      {page === "register" && <Register goToLogin={() => setPage("login")} />}
+      {page === "forgot" && <ForgotPassword goToLogin={() => setPage("login")} />}
 
-      {page === "forgot" && (
-        <ForgotPassword goToLogin={() => setPage("login")} />
-      )}
-
-
-      {/* =========================================
-          📊 APPLICATION / DASHBOARD ROUTES
-      ========================================= */}
-
+      {/* 📊 DASHBOARD ROUTES */}
       {page === "dashboard" && (
-        <Dashboard 
-          {...navProps} 
-          setQuotationId={setQuotationId} 
-        />
+        <Dashboard {...navProps} user={user} setQuotationId={setQuotationId} />
       )}
 
       {page === "create" && (
-        <CreateQuotation 
-          {...navProps} 
-          goBack={navProps.goToDashboard} 
-          setQuotationId={setQuotationId} 
-          quotationId={quotationId} 
-        />
+        <CreateQuotation {...navProps} user={user} goBack={navProps.goToDashboard} setQuotationId={setQuotationId} quotationId={quotationId} />
       )}
 
       {page === "preview" && (
-        <Preview 
-          {...navProps} 
-          goBack={navProps.goToCreate}
-          quotationId={quotationId} // ID set from URL will be passed here
-        />
+        <Preview {...navProps} user={user} goBack={navProps.goToCreate} id={quotationId} quotationId={quotationId} />
       )}
 
       {page === "export" && (
-        <Export 
+        <Export {...navProps} user={user} goBack={navProps.goToPreview} quotationId={quotationId} />
+      )}
+
+      {/* 🔥 SUBSCRIPTION */}
+      {page === "subscription" && (
+        <Subscription {...navProps} user={user} />
+      )}
+
+      {/* 👤 EDIT PROFILE */}
+      {page === "edit-profile" && (
+        <EditProfile 
           {...navProps} 
-          goBack={navProps.goToPreview} 
-          quotationId={quotationId} 
+          user={user} 
+          setUser={setUser} 
+          goBack={navProps.goToDashboard} 
         />
       )}
 
+      {/* ⚙️ SETTINGS */}
       {page === "settings" && (
-        <Settings {...navProps} />
+        <Settings {...navProps} user={user} />
+      )}
+
+      {/* ❓ HELP & SUPPORT */}
+      {page === "help" && (
+        <HelpSupport {...navProps} user={user} />
       )}
     </>
   );
 }
-
-export default App;

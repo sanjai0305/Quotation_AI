@@ -1,14 +1,16 @@
 import React from "react";
 import {
-  LayoutDashboard,
-  FileText,
-  Eye,
-  Download,
-  Settings,
-  Sparkles,
-  LogOut,
-  LifeBuoy
+  LayoutDashboard as DashboardIcon,
+  FileText as FileIcon,
+  Eye as EyeIcon,
+  Download as ExportIcon,
+  CreditCard as SubscriptionIcon,
+  LifeBuoy as HelpIcon,
+  Settings as SettingsIcon
 } from "lucide-react";
+
+// 🔥 IMPORT PROFILE SECTION
+import ProfileSection from "../../components/profile/ProfileSection"; 
 
 export default function Sidebar({
   active = "dashboard",
@@ -16,26 +18,47 @@ export default function Sidebar({
   goToDashboard,
   goToPreview,
   goToExport,
+  goToSubscription, 
   goToSettings,
+  goToHelp, // ✅ App.jsx-ல் இருந்து வரும் ரௌட்டிங் பங்க்ஷன்
+  goToEditProfile, 
+  user, 
 }) {
+
+  // ✅ SECURE LOGOUT HANDLER
+  const handleLogout = () => {
+    if (window.confirm("நிச்சயமாக வெளியேற வேண்டுமா? (Logout)")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user"); 
+      window.location.href = "/"; 
+    }
+  };
+
   return (
     <div className="w-[250px] bg-[#0B1120] text-slate-300 h-screen p-5 flex flex-col justify-between fixed left-0 top-0 border-r border-slate-800/60 shadow-2xl z-50">
 
-      {/* TOP SECTION */}
+      {/* TOP SECTION: LOGO & MENU */}
       <div>
 
-        {/* LOGO */}
-        <div className="flex items-center gap-3 mb-10 px-2 cursor-pointer group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all duration-300 group-hover:-translate-y-0.5">
-            <Sparkles size={18} className="text-white" />
+        {/* 🔥 CUSTOM VISION X LOGO */}
+        <div 
+          onClick={goToDashboard}
+          className="flex items-center gap-3 mb-10 px-2 cursor-pointer group"
+        >
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all duration-300 group-hover:-translate-y-0.5 border border-blue-500/30 shrink-0 bg-black">
+            <img src="/vision X logo.png" alt="Vision X" className="w-full h-full object-cover" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-white tracking-wide">QuoteGen Pro</h1>
-            <p className="text-[10px] text-blue-400 tracking-widest font-semibold uppercase">Enterprise</p>
+          <div className="min-w-0">
+            <h1 className="text-xl font-black tracking-wide text-white truncate">
+              vision<span className="text-blue-500">X</span>
+            </h1>
+            <p className="text-[8px] text-blue-400 tracking-[0.2em] font-bold uppercase mt-0.5 truncate">
+              Next-Gen Tech
+            </p>
           </div>
         </div>
 
-        {/* MAIN MENU */}
+        {/* MAIN MENU SECTION */}
         <div className="mb-8">
           <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-3 px-3">
             Main Menu
@@ -43,28 +66,28 @@ export default function Sidebar({
 
           <div className="space-y-1.5">
             <MenuItem
-              icon={<LayoutDashboard size={18} />}
+              icon={<DashboardIcon size={18} />}
               label="Dashboard"
               active={active === "dashboard"}
               onClick={goToDashboard}
             />
 
             <MenuItem
-              icon={<FileText size={18} />}
+              icon={<FileIcon size={18} />}
               label="Create Quote"
               active={active === "create"}
               onClick={goToCreate}
             />
 
             <MenuItem
-              icon={<Eye size={18} />}
+              icon={<EyeIcon size={18} />}
               label="Preview"
               active={active === "preview"}
               onClick={goToPreview}
             />
 
             <MenuItem
-              icon={<Download size={18} />}
+              icon={<ExportIcon size={18} />}
               label="Export"
               active={active === "export"}
               onClick={goToExport}
@@ -72,7 +95,7 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* SYSTEM MENU */}
+        {/* SYSTEM SECTION */}
         <div>
           <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wider mb-3 px-3">
             System
@@ -80,56 +103,61 @@ export default function Sidebar({
           
           <div className="space-y-1.5">
             <MenuItem
-              icon={<Settings size={18} />}
+              icon={<SubscriptionIcon size={18} />}
+              label="Manage Subscription"
+              active={active === "subscription"}
+              onClick={goToSubscription}
+            />
+            
+            {/* 🔥 Help & Support Button - இப்போ இது வேலை செய்யும் */}
+            <MenuItem
+              icon={<HelpIcon size={18} />}
+              label="Help & Support"
+              active={active === "help"}
+              onClick={goToHelp} 
+            />
+            
+            {/* 🔥 Settings Button */}
+            <MenuItem
+              icon={<SettingsIcon size={18} />}
               label="Settings"
               active={active === "settings"}
               onClick={goToSettings}
-            />
-            <MenuItem
-              icon={<LifeBuoy size={18} />}
-              label="Help & Support"
-              active={active === "help"}
-              onClick={() => {}}
             />
           </div>
         </div>
 
       </div>
 
-      {/* BOTTOM SECTION / USER PROFILE */}
+      {/* BOTTOM SECTION: USER PROFILE */}
       <div className="mt-auto pt-5 border-t border-slate-800/60">
-        <div className="bg-slate-800/30 rounded-xl p-3 flex items-center justify-between border border-slate-800/50 hover:bg-slate-800/50 transition-colors cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-sm shadow-inner">
-              A
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-white">Admin User</span>
-              <span className="text-[10px] text-slate-400">Pro Plan</span>
-            </div>
-          </div>
-          <button className="text-slate-400 hover:text-red-400 transition-colors focus:outline-none">
-            <LogOut size={16} />
-          </button>
-        </div>
+        <ProfileSection 
+          user={user} 
+          onLogout={handleLogout} 
+          goToSettings={goToSettings} 
+          goToEditProfile={goToEditProfile} 
+        />
       </div>
 
     </div>
   );
 }
 
-/* 🔥 REUSABLE MENU ITEM WITH PREMIUM EFFECTS */
+/* 🔥 REUSABLE MENU ITEM COMPONENT */
 function MenuItem({ icon, label, active, onClick }) {
   return (
     <div
-      onClick={onClick || (() => {})}
+      onClick={(e) => {
+        e.preventDefault();
+        if (onClick) onClick();
+      }}
       className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden ${
         active
           ? "text-white bg-blue-600 shadow-[0_4px_12px_rgba(37,99,235,0.2)]"
           : "text-slate-400 hover:text-white hover:bg-slate-800/80"
       }`}
     >
-      {/* Tiny active indicator glow (Optional nice touch) */}
+      {/* Active Indicator Glow */}
       {active && (
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-[0_0_10px_rgba(255,255,255,0.8)]"></div>
       )}

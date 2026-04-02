@@ -8,6 +8,7 @@ import {
   getDashboardStats,
 } from "../controllers/quotationController.js";
 import protect from "../middleware/authMiddleware.js";
+import checkSubscription from "../middleware/checkSubscription.js"; // 👈 புதுசா ஆட் பண்ணியிருக்கோம்
 
 const router = express.Router();
 
@@ -40,9 +41,10 @@ router.get("/public/:id", getQuotationById);
 router.get("/stats", protect, getDashboardStats);
 
 // ==============================
-// ➕ CREATE QUOTATION (Protected)
+// ➕ CREATE QUOTATION (Protected + 🚀 Subscription Check)
 // ==============================
-router.post("/", protect, createQuotation);
+// ட்ரையல் முடிஞ்சிருந்தா புதுசா கொட்டேஷன் கிரியேட் பண்ண முடியாது
+router.post("/", protect, checkSubscription, createQuotation); 
 
 // ==============================
 // 📄 GET ALL QUOTATIONS (Protected)
@@ -55,9 +57,10 @@ router.get("/", protect, getAllQuotations);
 router.get("/:id", protect, getQuotationById);
 
 // ==============================
-// ✏️ UPDATE QUOTATION (Protected)
+// ✏️ UPDATE QUOTATION (Protected + 🚀 Subscription Check)
 // ==============================
-router.put("/:id", protect, updateQuotation);
+// ட்ரையல் முடிஞ்சிருந்தா பழைய கொட்டேஷனை எடிட் பண்ண முடியாது
+router.put("/:id", protect, checkSubscription, updateQuotation);
 
 // ==============================
 // ❌ DELETE QUOTATION (Protected)

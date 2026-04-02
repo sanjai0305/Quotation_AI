@@ -1,142 +1,118 @@
 // ==============================
 // 🔐 PRE-LOAD ENV (ES MODULE FIX)
 // ==============================
-import "dotenv/config"; // This MUST be the very first line!
+import "dotenv/config"; 
 
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
+import fs from "fs"; 
+import { fileURLToPath } from "url";
 
 // ==============================
-// ⚙️ CONFIG
+// ⚙️ CONFIG & ROUTES
 // ==============================
 import connectDB from "./config/db.js";
 import { verifyMailConnection } from "./config/mail.js";
-
-// ==============================
-// 🛣️ ROUTES
-// ==============================
 import authRoutes from "./routes/authRoutes.js";
 import quotationRoutes from "./routes/quotationRoutes.js";
 import exportRoutes from "./routes/exportRoutes.js";
-
-// ==============================
-// 🛡️ MIDDLEWARE
-// ==============================
+import userRoutes from "./routes/userRoutes.js";                 // 👈 NEW
+import subscriptionRoutes from "./routes/subscriptionRoutes.js"; // 👈 NEW
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
-// 🔍 DEBUG ENV VARIABLES
-console.log("---------------------------------");
-console.log("📧 EMAIL_USER:", process.env.EMAIL_USER || "Missing ❌");
-console.log("📧 EMAIL_PASS:", process.env.EMAIL_PASS ? "Loaded ✅" : "Missing ❌");
-console.log("🔑 JWT_SECRET:", process.env.JWT_SECRET ? "Loaded ✅" : "Missing ❌");
-console.log("---------------------------------");
-
 // ==============================
-// 🚀 INIT APP
+// 🚀 INIT APP & PATHS
 // ==============================
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 🔥 Auto-create uploads folder so Multer doesn't crash
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("📁 Created 'uploads' directory");
+}
 
 // ==============================
-// 🔒 SECURITY
+// 🔒 SECURITY & CORS
 // ==============================
-app.use(helmet());
-app.disable("x-powered-by");
+app.use(helmet({
+  crossOriginResourcePolicy: false, // ✅ Critical: Allows frontend to display uploaded images
+}));
 
-// ==============================
-// 🌐 CORS CONFIG
-// ==============================
 const allowedOrigins = [
   "http://localhost:5173",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      console.warn("⚠️ CORS BLOCKED:", origin);
-      return callback(new Error("CORS blocked ❌"), false);
-    },
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: (origin, callback) => {
+    // Postman / Local requests testing support
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("CORS blocked ❌"), false);
+  },
+  credentials: true,
+}));
 
 // ==============================
-// 🧠 BODY PARSER
+// 🧠 MIDDLEWARES (Updated limits for Logo Base64)
 // ==============================
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// 🔥 Increased limit to 50mb because Base64 Image strings (Logos) can be very large
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// ==============================
-// 📜 LOGGER
-// ==============================
+// 📂 SERVE STATIC FILES
+// This makes http://localhost:5000/uploads/image.jpg accessible
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 
 // ==============================
-// ❤️ HEALTH CHECK
-// ==============================
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "QuoteGen API is running 🚀",
-    env: process.env.NODE_ENV || "development",
-    time: new Date().toISOString(),
-  });
-});
-
-// ==============================
 // 🚀 MAIN API ROUTES
 // ==============================
+app.get("/", (req, res) => {
+  res.status(200).json({ success: true, message: "QuoteGen API is running 🚀" });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/quotations", quotationRoutes);
 app.use("/api/export", exportRoutes);
+app.use("/api/users", userRoutes);               // 👈 NEW: For getting user profile
+app.use("/api/subscription", subscriptionRoutes); // 👈 NEW: For handling Pro upgrades
 
 // ==============================
-// ❌ NOT FOUND HANDLER
+// ❌ ERROR HANDLERS
 // ==============================
 app.use(notFound);
-
-// ==============================
-// 🔥 GLOBAL ERROR HANDLER
-// ==============================
 app.use(errorHandler);
 
 // ==============================
-// 🚀 START SERVER & SERVICES
+// 🚀 START SERVER
 // ==============================
 const PORT = process.env.PORT || 5000;
 let server;
 
 const startServer = async () => {
   try {
-    // 1️⃣ Connect to MongoDB
     await connectDB();
-    console.log("✅ MongoDB Connected successfully");
-
-    // 2️⃣ Verify Mail Transporter
     if (typeof verifyMailConnection === 'function') {
       await verifyMailConnection();
     }
 
-    // 3️⃣ Start Express Server
     server = app.listen(PORT, () => {
       console.log(`
 =================================
-🚀 Server running securely
-🌐 http://localhost:${PORT}
-📦 ENV: ${process.env.NODE_ENV || 'development'}
-=================================
-      `);
+🚀 Server: http://localhost:${PORT}
+📦 Mode: ${process.env.NODE_ENV || 'development'}
+=================================`);
     });
   } catch (error) {
     console.error("❌ Startup Error:", error.message);
@@ -146,23 +122,15 @@ const startServer = async () => {
 
 startServer();
 
-// ==============================
 // 🛑 GRACEFUL SHUTDOWN
-// ==============================
 const shutdown = (signal) => {
-  console.log(`\n🛑 ${signal} received... Shutting down gracefully.`);
-
+  console.log(`\n🛑 ${signal} received. Shutting down...`);
   if (server) {
-    server.close(() => {
-      console.log("💤 HTTP server closed.");
-      // If you want to close DB connection here, you can do mongoose.connection.close()
-      process.exit(0);
-    });
+    server.close(() => process.exit(0));
   } else {
     process.exit(0);
   }
 };
 
-// Listen for termination signals (Ctrl+C, Docker stop, etc.)
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
