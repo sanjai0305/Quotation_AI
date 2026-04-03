@@ -161,8 +161,14 @@ export default function App() {
         <CreateQuotation {...navProps} user={user} goBack={navProps.goToDashboard} setQuotationId={setQuotationId} quotationId={quotationId} />
       )}
 
+      {/* 🔥 UPDATED PREVIEW ROUTE (Removed id prop, using only quotationId) */}
       {page === "preview" && (
-        <Preview {...navProps} user={user} goBack={navProps.goToCreate} id={quotationId} quotationId={quotationId} />
+        <Preview 
+          {...navProps} 
+          user={user} 
+          goBack={navProps.goToCreate} 
+          quotationId={quotationId} 
+        />
       )}
 
       {page === "export" && (
