@@ -6,7 +6,7 @@ import {
   loginUser,
   resendOtp, 
 
-  // 🔁 PASSWORD (OTP/Reset)
+  // 🔁 PASSWORD (Forgot Link / Reset Token)
   forgotPassword,
   resetPassword,
 
@@ -56,11 +56,11 @@ router.post("/resend-otp", resendOtp);
  * ==============================
  */
 
-// 📩 Send OTP (forgot password)
+// 📩 Send Reset Link to Email (forgot password)
 router.post("/forgot-password", forgotPassword);
 
-// 🔒 Reset password (OTP + new password)
-router.post("/reset-password", resetPassword);
+// 🔒 Reset password (🔥 UPDATED: Now requires :token in the URL)
+router.post("/reset-password/:token", resetPassword);
 
 /**
  * ==============================

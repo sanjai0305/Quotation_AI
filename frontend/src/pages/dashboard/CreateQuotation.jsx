@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "./Sidebar";
 import { Save, Eye, RotateCcw, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
-// 🔥 IMPORT OUR NEW MODULAR COMPONENTS
 import ProjectDetailsForm from "../../components/quotation/ProjectDetailsForm";
 import RateTableForm from "../../components/quotation/RateTableForm";
 import TermsPaymentForm from "../../components/quotation/TermsPaymentForm";
 
 const BASE_URL = "http://localhost:5000/api/quotations";
 
+// API Calls
 export const createQuotation = async (data) => {
   const token = localStorage.getItem("token"); 
   const res = await fetch(BASE_URL, { 
@@ -30,32 +30,59 @@ export const updateQuotationAPI = async (id, data) => {
 };
 
 export default function CreateQuotation({ 
-  user, 
-  goBack, 
-  goToPreview, 
-  goToExport, 
-  goToDashboard, 
-  goToSubscription, 
-  goToSettings,
-  goToHelp, // 🔥 NEW: Added Help Prop
-  goToEditProfile, 
-  setQuotationId, 
-  quotationId 
+  user, goBack, goToPreview, goToExport, goToDashboard, 
+  goToSubscription, goToSettings, goToHelp, goToEditProfile, 
+  setQuotationId, quotationId 
 }) {
   const fileInputRef = useRef(null);
 
   const getInitialData = () => {
     const savedDraft = localStorage.getItem("previewDraft");
     if (savedDraft) {
-      try { return JSON.parse(savedDraft); } catch (error) { console.error(error); }
+      try { 
+        const parsed = JSON.parse(savedDraft);
+        
+        // 🔥 AUTO-MIGRATION: Update old drafts to have workingArea & subject
+        if (parsed.rateTable && !parsed.rateSections) {
+          parsed.rateSections = [{ id: Date.now(), title: "Material & Labour Rates", workingArea: "", rows: parsed.rateTable }];
+          delete parsed.rateTable;
+        } else if (parsed.rateSections) {
+          parsed.rateSections = parsed.rateSections.map(sec => ({ ...sec, workingArea: sec.workingArea || "" }));
+        }
+        
+        // 🔥 AUTO-MIGRATION: Add subject if it's missing in old draft
+        if (parsed.projectDetails && parsed.projectDetails.subject === undefined) {
+          parsed.projectDetails.subject = "";
+        }
+        
+        return parsed; 
+      } catch (error) { 
+        console.error("Error parsing draft:", error); 
+      }
     }
+    
+    // Default Initial State (Removed coverLetter and areaDetails)
     return {
-      projectDetails: { companyLogo: "", companyName: "", clientName: "", projectName: "", referenceNo: "", date: new Date().toISOString().split('T')[0], paintBrand: "Nippon Paint" },
-      areaDetails: { interiorArea: "", exteriorArea: "" },
-      coverLetter: { subject: "Paint Quote For", body: "Thank you for your purchase enquiry for the above mentioned site. Please find below our quotation for Material & Labour for this site." },
-      rateTable: [
-        { id: 1, work: "Surface Preparation, Wall Putty (3 Coats)", labour: 5, material: 3, total: 8 },
-        { id: 2, work: "Primer (1 Coat)", labour: 1, material: 1, total: 2 },
+      projectDetails: { 
+        companyLogo: "", 
+        companyName: "", 
+        clientName: "", 
+        projectName: "", 
+        referenceNo: "", 
+        subject: "", 
+        date: new Date().toISOString().split('T')[0], 
+        paintBrand: "" // Empty so datalist placeholder shows
+      },
+      rateSections: [
+        {
+          id: 1, 
+          title: "Material & Labour Rates", 
+          workingArea: "", 
+          rows: [
+            { id: 101, work: "Surface Preparation, Wall Putty (3 Coats)", labour: 5, material: 3, total: 8 },
+            { id: 102, work: "Primer (1 Coat)", labour: 1, material: 1, total: 2 },
+          ]
+        }
       ],
       pricing: { discount: "", warranty: "3" },
       timeline: { startDate: "", endDate: "" },
@@ -72,13 +99,24 @@ export default function CreateQuotation({
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
-  useEffect(() => localStorage.setItem("previewDraft", JSON.stringify(formData)), [formData]);
+  // Auto-save to draft on change
+  useEffect(() => {
+    localStorage.setItem("previewDraft", JSON.stringify(formData));
+  }, [formData]);
 
-  const totalLabour = formData.rateTable.reduce((acc, row) => acc + (Number(row.labour) || 0), 0);
-  const totalMaterial = formData.rateTable.reduce((acc, row) => acc + (Number(row.material) || 0), 0);
-  const totalSqft = formData.rateTable.reduce((acc, row) => acc + (Number(row.total) || 0), 0);
+  // 🔥 CALCULATE GRAND TOTALS
+  let totalLabour = 0, totalMaterial = 0, totalSqft = 0;
+  formData.rateSections?.forEach(section => {
+    section.rows.forEach(row => {
+      totalLabour += (Number(row.labour) || 0);
+      totalMaterial += (Number(row.material) || 0);
+      totalSqft += (Number(row.total) || 0);
+    });
+  });
 
-  const handleNestedChange = (section, field, value) => setFormData((prev) => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
+  const handleNestedChange = (section, field, value) => {
+    setFormData((prev) => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
+  };
 
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
@@ -89,29 +127,79 @@ export default function CreateQuotation({
     reader.onloadend = () => handleNestedChange("projectDetails", "companyLogo", reader.result);
   };
 
-  const removeLogo = () => { handleNestedChange("projectDetails", "companyLogo", ""); if(fileInputRef.current) fileInputRef.current.value = ""; };
-
-  const handleRateTableChange = (id, field, value) => {
-    setFormData((prev) => {
-      const newTable = prev.rateTable.map((row) => {
-        if (row.id === id) {
-          const updatedRow = { ...row, [field]: value };
-          if (field === "labour" || field === "material") updatedRow.total = (Number(updatedRow.labour) || 0) + (Number(updatedRow.material) || 0);
-          return updatedRow;
-        }
-        return row;
-      });
-      return { ...prev, rateTable: newTable };
-    });
+  const removeLogo = () => { 
+    handleNestedChange("projectDetails", "companyLogo", ""); 
+    if(fileInputRef.current) fileInputRef.current.value = ""; 
   };
 
-  const addRateRow = () => setFormData((prev) => ({ ...prev, rateTable: [...prev.rateTable, { id: Date.now(), work: "", labour: 0, material: 0, total: 0 }] }));
-  const deleteRateRow = (id) => setFormData((prev) => ({ ...prev, rateTable: prev.rateTable.filter(row => row.id !== id) }));
+  // 🔥 MULTI-TABLE FUNCTIONS
+  const handleSectionTitleChange = (sectionId, value) => {
+    setFormData(prev => ({
+      ...prev, rateSections: prev.rateSections.map(sec => sec.id === sectionId ? { ...sec, title: value } : sec)
+    }));
+  };
 
-  const showToast = (msg, type) => { setToast({ show: true, message: msg, type }); setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000); };
+  const handleSectionAreaChange = (sectionId, value) => {
+    setFormData(prev => ({
+      ...prev, rateSections: prev.rateSections.map(sec => sec.id === sectionId ? { ...sec, workingArea: value } : sec)
+    }));
+  };
+
+  const addSection = () => {
+    setFormData(prev => ({
+      ...prev, rateSections: [...prev.rateSections, { id: Date.now(), title: "New Category", workingArea: "", rows: [{ id: Date.now() + 1, work: "", labour: 0, material: 0, total: 0 }] }]
+    }));
+  };
+
+  const deleteSection = (sectionId) => {
+    setFormData(prev => ({ ...prev, rateSections: prev.rateSections.filter(sec => sec.id !== sectionId) }));
+  };
+
+  const handleRateTableChange = (sectionId, rowId, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      rateSections: prev.rateSections.map((sec) => {
+        if (sec.id === sectionId) {
+          return {
+            ...sec,
+            rows: sec.rows.map((row) => {
+              if (row.id === rowId) {
+                const updatedRow = { ...row, [field]: value };
+                if (field === "labour" || field === "material") {
+                  updatedRow.total = (Number(updatedRow.labour) || 0) + (Number(updatedRow.material) || 0);
+                }
+                return updatedRow;
+              }
+              return row;
+            })
+          };
+        }
+        return sec;
+      })
+    }));
+  };
+
+  const addRateRow = (sectionId) => {
+    setFormData((prev) => ({
+      ...prev, rateSections: prev.rateSections.map(sec => sec.id === sectionId ? { ...sec, rows: [...sec.rows, { id: Date.now(), work: "", labour: 0, material: 0, total: 0 }] } : sec)
+    }));
+  };
+
+  const deleteRateRow = (sectionId, rowId) => {
+    setFormData((prev) => ({
+      ...prev, rateSections: prev.rateSections.map(sec => sec.id === sectionId ? { ...sec, rows: sec.rows.filter(r => r.id !== rowId) } : sec)
+    }));
+  };
+
+  const showToast = (msg, type) => { 
+    setToast({ show: true, message: msg, type }); 
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000); 
+  };
 
   const handleSave = async () => {
-    if (!formData.projectDetails.clientName.trim()) return showToast("Client Name is required!", "error");
+    if (!formData.projectDetails.clientName.trim()) {
+      return showToast("Client Name is required!", "error");
+    }
     setIsSaving(true);
     try {
       const response = quotationId ? await updateQuotationAPI(quotationId, formData) : await createQuotation(formData);
@@ -132,7 +220,7 @@ export default function CreateQuotation({
   return (
     <div className="bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-50/50 via-slate-50 to-slate-100 min-h-screen font-sans selection:bg-blue-200">
       
-      {/* TOAST NOTIFICATION */}
+      {/* Toast Notification */}
       {toast.show && (
         <div className={`fixed top-24 right-8 z-[100] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-fade-in border ${toast.type === 'success' ? 'bg-white border-emerald-100 text-emerald-700' : 'bg-white border-red-100 text-red-700'}`}>
           {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
@@ -140,25 +228,19 @@ export default function CreateQuotation({
         </div>
       )}
 
-      {/* SIDEBAR */}
+      {/* Sidebar */}
       <div className="fixed top-0 left-0 h-screen w-[250px] z-30 shadow-[4px_0_24px_rgba(0,0,0,0.04)]">
         <Sidebar 
-          active="create" 
-          user={user} 
-          goToDashboard={goToDashboard} 
-          goToCreate={() => {}} 
-          goToPreview={goToPreview} 
-          goToExport={goToExport} 
-          goToSubscription={goToSubscription}
-          goToSettings={goToSettings} 
-          goToHelp={goToHelp} // 🔥 PERFECTLY PASSED TO SIDEBAR
-          goToEditProfile={goToEditProfile} 
+          active="create" user={user} goToDashboard={goToDashboard} goToCreate={() => {}} 
+          goToPreview={goToPreview} goToExport={goToExport} goToSubscription={goToSubscription}
+          goToSettings={goToSettings} goToHelp={goToHelp} goToEditProfile={goToEditProfile} 
         />
       </div>
 
+      {/* Main Content */}
       <div className="ml-[250px] h-screen flex flex-col relative">
         
-        {/* PREMIUM HEADER */}
+        {/* Header Bar */}
         <div className="flex justify-between items-center px-10 py-6 bg-white/70 backdrop-blur-xl sticky top-0 z-20 border-b border-slate-200/60 shadow-sm">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
@@ -169,39 +251,22 @@ export default function CreateQuotation({
           </div>
           
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => { if(window.confirm("Clear all data?")) { localStorage.removeItem("previewDraft"); window.location.reload(); } }} 
-              className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-red-500 px-4 py-2.5 rounded-xl transition-colors group"
-            >
+            <button onClick={() => { if(window.confirm("Clear all data?")) { localStorage.removeItem("previewDraft"); window.location.reload(); } }} className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-red-500 px-4 py-2.5 rounded-xl transition-colors group">
               <RotateCcw size={16} className="group-hover:-rotate-180 transition-transform duration-500" /> Reset
             </button>
-            
-            <button 
-              onClick={goToPreview} 
-              className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-white border border-slate-200/80 px-6 py-2.5 rounded-xl hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all hover:-translate-y-0.5"
-            >
+            <button onClick={goToPreview} className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-white border border-slate-200/80 px-6 py-2.5 rounded-xl hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all hover:-translate-y-0.5">
               <Eye size={16} className="text-slate-400" /> Preview
             </button>
-            
-            <button 
-              onClick={handleSave} 
-              disabled={isSaving} 
-              className={`flex items-center gap-2 text-sm font-bold text-white px-8 py-2.5 rounded-xl shadow-lg transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0
-                ${isSaving ? 'bg-indigo-400 cursor-wait' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/30'}`}
-            >
-              {isSaving ? (
-                <> <Loader2 size={18} className="animate-spin"/> Saving... </>
-              ) : (
-                <> <Save size={18}/> {quotationId ? "Update Quote" : "Save Quote"} </>
-              )}
+            <button onClick={handleSave} disabled={isSaving} className={`flex items-center gap-2 text-sm font-bold text-white px-8 py-2.5 rounded-xl shadow-lg transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0 ${isSaving ? 'bg-indigo-400 cursor-wait' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/30'}`}>
+              {isSaving ? <> <Loader2 size={18} className="animate-spin"/> Saving... </> : <> <Save size={18}/> {quotationId ? "Update Quote" : "Save Quote"} </>}
             </button>
           </div>
         </div>
 
-        {/* MAIN FORM AREA */}
+        {/* Form Area */}
         <div className="flex-1 overflow-y-auto p-10 max-w-5xl mx-auto w-full pb-32">
-          
           <div className="space-y-8 animate-fade-in-up">
+            
             <ProjectDetailsForm 
               formData={formData} 
               handleNestedChange={handleNestedChange} 
@@ -211,10 +276,14 @@ export default function CreateQuotation({
             />
             
             <RateTableForm 
-              formData={formData} 
+              rateSections={formData.rateSections} 
+              handleSectionTitleChange={handleSectionTitleChange}
+              handleSectionAreaChange={handleSectionAreaChange} 
               handleRateTableChange={handleRateTableChange} 
               addRateRow={addRateRow} 
               deleteRateRow={deleteRateRow} 
+              addSection={addSection}
+              deleteSection={deleteSection}
               totalLabour={totalLabour} 
               totalMaterial={totalMaterial} 
               totalSqft={totalSqft} 
@@ -225,8 +294,8 @@ export default function CreateQuotation({
               handleNestedChange={handleNestedChange} 
               setFormData={setFormData} 
             />
+            
           </div>
-
         </div>
       </div>
     </div>

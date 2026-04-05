@@ -5,8 +5,10 @@ import { PassThrough } from "stream";
 /**
  * Helper function to generate PDF as a memory buffer
  * 🔥 This directly uses your advanced pdfService.js so the design ALWAYS matches!
+ * @param {Object} quotation - Quotation Document
+ * @param {String} templateName - The chosen template design
  */
-const createPDFBuffer = async (quotation) => {
+const createPDFBuffer = async (quotation, templateName) => {
   return new Promise(async (resolve, reject) => {
     try {
       // Create a PassThrough stream to catch the PDF output instead of sending it to browser
@@ -24,8 +26,8 @@ const createPDFBuffer = async (quotation) => {
       mockRes.status = () => mockRes;
       mockRes.json = (errData) => reject(new Error(errData.message || "PDF Generation failed"));
       
-      // Call your Advanced Enterprise PDF Generator
-      await generateQuotationPDF(quotation, mockRes);
+      // Call your Advanced Enterprise PDF Generator WITH the template name
+      await generateQuotationPDF(quotation, mockRes, templateName);
       
     } catch (error) {
       reject(error);
@@ -37,8 +39,9 @@ const createPDFBuffer = async (quotation) => {
  * 📧 Send Quotation Email with PDF Attachment
  * @param {string} toEmail - Client Email
  * @param {Object} quotation - Quotation Document
+ * @param {String} templateName - The chosen template design
  */
-export const sendQuotationEmail = async (toEmail, quotation) => {
+export const sendQuotationEmail = async (toEmail, quotation, templateName = 'classic') => {
   try {
     const refNo = quotation.projectDetails?.referenceNo || "Draft";
     const companyName = quotation.projectDetails?.companyName || "Our Company";
@@ -46,7 +49,8 @@ export const sendQuotationEmail = async (toEmail, quotation) => {
     const grandTotal = quotation.pricing?.grandTotal || 0;
 
     // 1. Generate PDF Buffer (Using the exact same UI as the download button!)
-    const pdfBuffer = await createPDFBuffer(quotation);
+    // 🔥 Pass the template name to the buffer creator
+    const pdfBuffer = await createPDFBuffer(quotation, templateName);
 
     // 2. Email HTML Template (Clean & Professional)
     const html = `
@@ -91,7 +95,7 @@ export const sendQuotationEmail = async (toEmail, quotation) => {
       html: html,
       attachments: [
         {
-          filename: `Quotation_${refNo}.pdf`,
+          filename: `Quotation_${refNo.replace(/\s+/g, '_')}.pdf`,
           content: pdfBuffer,
           contentType: "application/pdf"
         }

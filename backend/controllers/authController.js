@@ -1,7 +1,9 @@
+import crypto from "crypto"; // 🔥 ADDED: For generating secure reset tokens
 import User from "../models/User.js";
 import Quotation from "../models/Quotation.js";
 import generateOtp, { getOtpExpiry } from "../utils/generateOtp.js";
-import sendEmail from "../utils/sendEmail.js";
+import sendEmail from "../utils/sendEmail.js"; // For OTP emails
+import { sendPasswordResetEmail } from "../config/mail.js"; // 🔥 ADDED: For Reset Link emails
 import generateToken from "../utils/generateToken.js";
 
 // ==============================
@@ -174,54 +176,72 @@ export const loginUser = async (req, res) => {
 };
 
 // ==============================
-// 🔁 FORGOT PASSWORD
+// 📩 FORGOT PASSWORD (SEND RESET LINK)
 // ==============================
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.json({ message: "If email exists, OTP sent" });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "No account found with this email ❌" });
+    }
 
-    const otp = generateOtp();
-    user.otp = otp;
-    user.otpExpires = getOtpExpiry(5);
+    // 1. Generate Secure Token
+    const resetToken = crypto.randomBytes(32).toString("hex");
 
+    // 2. Save Token & Expiry (1 Hour) to DB
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; 
     await user.save();
-    await sendEmail(email, otp);
 
-    res.json({ message: "OTP sent successfully" });
+    // 3. Create Reset Link (Frontend URL)
+    const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+
+    // 4. Send Email using the advanced template we created
+    await sendPasswordResetEmail(user.email, resetUrl);
+
+    res.json({ success: true, message: "Reset link sent successfully to your email! ✅" });
 
   } catch (err) {
-    res.status(500).json({ message: "Failed to send OTP" });
+    console.error("Forgot Password Error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to send reset link" });
   }
 };
 
 // ==============================
-// 🔁 RESET PASSWORD
+// 🔑 RESET PASSWORD (UPDATE DB)
 // ==============================
 export const resetPassword = async (req, res) => {
-  const { email, otp, newPassword } = req.body;
+  // Token now comes from the URL parameter, not the body
+  const { token } = req.params; 
+  const { password } = req.body;
 
   try {
-    const user = await User.findOne({ email });
-    const cleanOtp = otp ? otp.toString().replace(/\s/g, "") : "";
-    
-    const valid = user && user.otp === cleanOtp && user.otpExpires > Date.now();
+    // Check if token matches and has not expired
+    const user = await User.findOne({ 
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() } // $gt means Greater Than current time
+    });
 
-    if (!valid) {
-      return res.status(400).json({ message: "Invalid or expired OTP ❌" });
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Invalid or expired reset link. ❌" });
     }
 
-    user.password = newPassword; 
-    user.otp = null;
-    user.otpExpires = null;
+    // Update password (Mongoose pre-save hook will hash it automatically)
+    user.password = password; 
+    
+    // Clear the reset token fields
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    
     await user.save();
 
-    res.json({ message: "Password reset successful 🎉" });
+    res.json({ success: true, message: "Password reset successful! 🎉" });
 
   } catch (err) {
-    res.status(500).json({ message: "Reset failed" });
+    console.error("Reset Password Error:", err.message);
+    res.status(500).json({ success: false, message: "Password reset failed" });
   }
 };
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword"; // 🔥 ADDED THIS IMPORT
 
 // 📊 DASHBOARD PAGES
 import Dashboard from "./pages/dashboard/Dashboard";
@@ -23,6 +24,7 @@ export default function App() {
   const [page, setPage] = useState("loading");
   const [quotationId, setQuotationId] = useState(null);
   const [user, setUser] = useState(null); 
+  const [resetToken, setResetToken] = useState(null); // 🔥 ADDED STATE FOR TOKEN
 
   // ==========================================
   // 🔥 URL ROUTING & AUTH CHECK
@@ -41,7 +43,17 @@ export default function App() {
       }
     }
 
-    // 1. PUBLIC Preview Link Check
+    // 1. PUBLIC Reset Password Link Check 🔥 (Added this block)
+    if (path.startsWith("/reset-password/")) {
+      const tokenFromUrl = path.split("/")[2]; // Extracts token from /reset-password/TOKEN
+      if (tokenFromUrl) {
+        setResetToken(tokenFromUrl);
+        setPage("reset-password");
+        return; // Stop further checks, let them reset the password
+      }
+    }
+
+    // 2. PUBLIC Preview Link Check
     if (path.startsWith("/preview/")) {
       const idFromUrl = path.split("/")[2]; 
       if (idFromUrl && idFromUrl.length === 24) {
@@ -51,7 +63,7 @@ export default function App() {
       }
     }
 
-    // 2. Standard Auth Check
+    // 3. Standard Auth Check
     if (token) {
       if (path.includes("/subscription")) setPage("subscription");
       else if (path.includes("/edit-profile")) setPage("edit-profile");
@@ -62,7 +74,7 @@ export default function App() {
       else if (path.includes("/export")) setPage("export");
       else setPage("dashboard");
     } else {
-      setPage("login");
+      setPage("login"); // Fallback for unauthenticated users
     }
   }, []);
 
@@ -150,7 +162,20 @@ export default function App() {
       )}
 
       {page === "register" && <Register goToLogin={() => setPage("login")} />}
+      
+      {/* Ask for Email Page */}
       {page === "forgot" && <ForgotPassword goToLogin={() => setPage("login")} />}
+      
+      {/* 🔥 NEW: Actual Reset Password Page (User lands here from email link) */}
+      {page === "reset-password" && (
+        <ResetPassword 
+          token={resetToken} 
+          goToLogin={() => {
+            window.history.pushState({}, "", "/"); 
+            setPage("login");
+          }} 
+        />
+      )}
 
       {/* 📊 DASHBOARD ROUTES */}
       {page === "dashboard" && (
@@ -161,7 +186,7 @@ export default function App() {
         <CreateQuotation {...navProps} user={user} goBack={navProps.goToDashboard} setQuotationId={setQuotationId} quotationId={quotationId} />
       )}
 
-      {/* 🔥 UPDATED PREVIEW ROUTE (Removed id prop, using only quotationId) */}
+      {/* 🔥 UPDATED PREVIEW ROUTE */}
       {page === "preview" && (
         <Preview 
           {...navProps} 

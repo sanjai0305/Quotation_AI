@@ -3,37 +3,68 @@ import Quotation from "../models/Quotation.js";
 import { generateQuotationId } from "../utils/generateQuotationId.js";
 
 // ==============================
-// 🔥 HELPER: CALCULATE TOTALS
+// 🔥 HELPER: CALCULATE TOTALS (UPDATED FOR MULTI-SECTION & AREA)
 // ==============================
 const calculatePricing = (data) => {
-  let subtotal = 0;
+  let grandSubtotal = 0;
 
-  // 1. Calculate Row Totals & Subtotal
-  if (data.rateTable && data.rateTable.length > 0) {
+  // 1. Calculate Multi-Category Rows & Working Area
+  if (data.rateSections && data.rateSections.length > 0) {
+    data.rateSections = data.rateSections.map((section) => {
+      let sectionRatePerSqft = 0;
+
+      // Calculate individual rows inside the section
+      if (section.rows && section.rows.length > 0) {
+        section.rows = section.rows.map((row) => {
+          const labour = Number(row.labour || 0);
+          const material = Number(row.material || 0);
+          const total = labour + material;
+          
+          sectionRatePerSqft += total;
+
+          return {
+            ...row,
+            labour,
+            material,
+            total,
+          };
+        });
+      }
+
+      // Multiply by Working Area (If no area given, default to 1)
+      const area = Number(section.workingArea) > 0 ? Number(section.workingArea) : 1;
+      const sectionTotalAmount = sectionRatePerSqft * area;
+
+      grandSubtotal += sectionTotalAmount;
+
+      return {
+        ...section,
+        sectionTotalAmount // Good to keep track in DB
+      };
+    });
+  } 
+  // Backward compatibility for older drafts
+  else if (data.rateTable && data.rateTable.length > 0) {
     data.rateTable = data.rateTable.map((row) => {
       const labour = Number(row.labour || 0);
       const material = Number(row.material || 0);
       const total = labour + material;
-
-      subtotal += total;
-
-      return {
-        ...row,
-        labour,
-        material,
-        total,
-      };
+      grandSubtotal += total;
+      return { ...row, labour, material, total };
     });
   }
 
-  // 2. Calculate Discount & Grand Total
+  // 2. Calculate Discount, Tax & Grand Total
   const discountPercent = Number(data.pricing?.discount || 0);
-  const discountAmount = (subtotal * discountPercent) / 100;
+  const discountAmount = (grandSubtotal * discountPercent) / 100;
+  const taxAmount = Number(data.pricing?.tax || 0);
 
   data.pricing = {
     ...data.pricing,
-    subtotal,
-    grandTotal: Math.max(subtotal - discountAmount, 0),
+    subtotal: grandSubtotal,
+    discountAmount: discountAmount,
+    taxAmount: taxAmount,
+    grandTotal: Math.max(grandSubtotal - discountAmount + taxAmount, 0),
   };
 
   return data;
@@ -109,6 +140,7 @@ export const getAllQuotations = async (req, res) => {
         { "projectDetails.clientName": { $regex: search, $options: "i" } },
         { "projectDetails.projectName": { $regex: search, $options: "i" } },
         { "projectDetails.referenceNo": { $regex: search, $options: "i" } },
+        { "projectDetails.subject": { $regex: search, $options: "i" } } // Added subject search
       ];
     }
 

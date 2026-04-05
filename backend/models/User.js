@@ -45,6 +45,16 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    // 🔥 --- FORGOT PASSWORD RESET FIELDS (NEW) --- 🔥
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: null,
+    },
+
     // --- PROFILE FIELDS (Matches your React Form) ---
     designation: {
       type: String,
@@ -66,7 +76,7 @@ const userSchema = new mongoose.Schema(
       default: "", // Stores URL or file path
     },
 
-    // 🚀 --- SUBSCRIPTION & TRIAL FIELDS (UPDATED) --- 🚀
+    // 🚀 --- SUBSCRIPTION & TRIAL FIELDS --- 🚀
     plan: {
       type: String,
       enum: ["basic", "pro"], 
@@ -116,6 +126,11 @@ userSchema.set("toJSON", {
     delete ret.password;
     delete ret.otp;
     delete ret.otpExpires;
+    
+    // 🔥 Remove reset token fields from API responses for security
+    delete ret.resetPasswordToken;
+    delete ret.resetPasswordExpires;
+    
     delete ret.__v;
     return ret;
   },

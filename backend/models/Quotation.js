@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 // ==============================
-// 🔹 RATE ITEM SCHEMA
+// 🔹 RATE ITEM SCHEMA (Single Row)
 // ==============================
 const rateItemSchema = new mongoose.Schema(
   {
@@ -30,11 +30,34 @@ const rateItemSchema = new mongoose.Schema(
 );
 
 // ==============================
+// 🔥 NEW: RATE SECTION SCHEMA (Category Box)
+// ==============================
+const rateSectionSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      trim: true,
+      default: "Material & Labour Rates",
+    },
+    workingArea: { // 🔥 NEW: Added Working Area support
+      type: String,
+      trim: true,
+      default: "",
+    },
+    rows: {
+      type: [rateItemSchema],
+      default: [],
+    }
+  },
+  { _id: true } // keeping id to help with React mapping if needed
+);
+
+// ==============================
 // 🔹 MAIN SCHEMA
 // ==============================
 const quotationSchema = new mongoose.Schema(
   {
-    // 🔥 ADDED: LINK QUOTATION TO THE LOGGED-IN USER
+    // 🔥 LINK QUOTATION TO THE LOGGED-IN USER
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -43,22 +66,22 @@ const quotationSchema = new mongoose.Schema(
 
     // 🏢 PROJECT DETAILS
     projectDetails: {
-      companyLogo: { type: String, default: "" }, // 🔥 ADDED: TO SAVE LOGO IN DATABASE
+      companyLogo: { type: String, default: "" },
       companyName: { type: String, trim: true, default: "" },
       clientName: { type: String, required: true, trim: true },
       projectName: { type: String, trim: true, default: "" },
       referenceNo: { type: String, trim: true, default: null },
+      subject: { type: String, trim: true, default: "" }, // 🔥 NEW: Subject Field
       date: { type: Date, default: Date.now },
-      paintBrand: {
+      paintBrand: { // 🔥 UPDATED: Removed enum to allow custom brands
         type: String,
-        enum: ["Nippon Paint", "Asian Paints", "Berger Paints", "Dulux"],
-        default: "Nippon Paint",
+        trim: true,
+        default: "",
       },
     },
 
     // 📐 AREA DETAILS
     areaDetails: {
-      // Changed to String because frontend might send "" which crashes Number types
       interiorArea: { type: String, default: "" },
       exteriorArea: { type: String, default: "" },
     },
@@ -69,7 +92,13 @@ const quotationSchema = new mongoose.Schema(
       body: { type: String, trim: true, default: "" },
     },
 
-    // 📊 RATE TABLE
+    // 🔥 NEW: MULTIPLE RATE SECTIONS (Replaces single rateTable)
+    rateSections: {
+      type: [rateSectionSchema],
+      default: [],
+    },
+
+    // 🔄 LEGACY SUPPORT: Keeping this just in case old data exists
     rateTable: {
       type: [rateItemSchema],
       default: [],
@@ -78,9 +107,10 @@ const quotationSchema = new mongoose.Schema(
     // 💰 PRICING
     pricing: {
       subtotal: { type: Number, default: 0, min: 0 },
-      discount: { type: Number, default: 0, min: 0, max: 100 }, // % discount
+      discount: { type: Number, default: 0, min: 0, max: 100 }, 
+      tax: { type: Number, default: 0, min: 0 }, // Optional tax field
       grandTotal: { type: Number, default: 0, min: 0 },
-      warranty: { type: String, default: "" }, // Changed to string to support "3" or "3 Years"
+      warranty: { type: String, default: "" }, 
     },
 
     // 📅 TIMELINE
@@ -148,33 +178,53 @@ const quotationSchema = new mongoose.Schema(
 // ==============================
 // 🔥 AUTO CALCULATIONS (Safety Net)
 // ==============================
-// Note: We already calculate this in the controller, but this ensures DB integrity
 const calculateTotals = (doc) => {
-  if (!doc.rateTable?.length) return;
-
   let subtotal = 0;
 
-  doc.rateTable = doc.rateTable.map((item) => {
-    const labour = Number(item.labour || 0);
-    const material = Number(item.material || 0);
-    const total = labour + material;
+  // 🔥 1. Calculate totals for NEW Multiple Sections Format (WITH AREA MATH)
+  if (doc.rateSections && doc.rateSections.length > 0) {
+    doc.rateSections.forEach((section) => {
+      let sectionRateTotal = 0;
 
-    subtotal += total;
+      section.rows.forEach((item) => {
+        const labour = Number(item.labour || 0);
+        const material = Number(item.material || 0);
+        const total = labour + material;
 
-    return {
-      ...item,
-      labour,
-      material,
-      total,
-    };
-  });
+        sectionRateTotal += total;
+
+        item.labour = labour;
+        item.material = material;
+        item.total = total;
+      });
+
+      // Area Math
+      const area = Number(section.workingArea) > 0 ? Number(section.workingArea) : 1;
+      subtotal += (sectionRateTotal * area);
+    });
+  } 
+  // 🔄 2. Fallback Calculation for OLD Single Table Format
+  else if (doc.rateTable && doc.rateTable.length > 0) {
+    doc.rateTable.forEach((item) => {
+      const labour = Number(item.labour || 0);
+      const material = Number(item.material || 0);
+      const total = labour + material;
+
+      subtotal += total;
+
+      item.labour = labour;
+      item.material = material;
+      item.total = total;
+    });
+  }
 
   const discountPercent = Number(doc.pricing?.discount || 0);
   const discountAmount = (subtotal * discountPercent) / 100;
+  const taxAmount = Number(doc.pricing?.tax || 0);
 
   if (!doc.pricing) doc.pricing = {};
   doc.pricing.subtotal = subtotal;
-  doc.pricing.grandTotal = Math.max(subtotal - discountAmount, 0);
+  doc.pricing.grandTotal = Math.max(subtotal - discountAmount + taxAmount, 0);
 };
 
 // ==============================
@@ -189,19 +239,19 @@ quotationSchema.pre("save", function (next) {
 // 🔍 INDEXES
 // ==============================
 
-// 🔥 FAST QUERY: Index for getting user's specific quotations quickly
+// Fast query index
 quotationSchema.index({ user: 1 });
 
-// 🔎 Text search
+// Text search
 quotationSchema.index({
   "projectDetails.clientName": "text",
   "projectDetails.projectName": "text",
 });
 
-// ⚡ Fast sorting
+// Fast sorting
 quotationSchema.index({ createdAt: -1 });
 
-// 🛡 Prevent duplicate null issue
+// Prevent duplicate ref issue
 quotationSchema.index(
   { "projectDetails.referenceNo": 1 },
   { sparse: true }

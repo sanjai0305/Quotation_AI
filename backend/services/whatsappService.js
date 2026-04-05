@@ -1,6 +1,5 @@
 import twilio from "twilio";
 import { generateQuotationPDF } from "./pdfService.js";
-import { PassThrough } from "stream";
 
 // Twilio Credentials (இதை .env ஃபைல்ல வெச்சுக்கோங்க)
 const accountSid = process.env.TWILIO_ACCOUNT_SID; 
@@ -10,25 +9,25 @@ const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER; // e.g., 'whats
 const client = twilio(accountSid, authToken);
 
 /**
- * Helper function to generate PDF Buffer (Reused from Email Service)
+ * Helper function to generate PDF Buffer using Puppeteer
+ * 🔥 Much simpler now because Puppeteer sends the full buffer at once!
  */
-const createPDFBuffer = async (quotation) => {
+const createPDFBuffer = async (quotation, templateName) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const stream = new PassThrough();
-      const buffers = [];
+      // Mock Express 'res' object to catch the Puppeteer PDF Buffer
+      const mockRes = {
+        headersSent: false,
+        setHeader: () => {}, 
+        contentType: () => {},
+        status: function() { return this; },
+        send: (buffer) => resolve(buffer), // Catch the buffer here
+        end: (buffer) => resolve(buffer),  // Fallback
+        json: (errData) => reject(new Error(errData.message || "PDF Generation failed"))
+      };
       
-      stream.on("data", (chunk) => buffers.push(chunk));
-      stream.on("end", () => resolve(Buffer.concat(buffers)));
-      stream.on("error", reject);
-
-      const mockRes = stream;
-      mockRes.setHeader = () => {}; 
-      mockRes.headersSent = false;
-      mockRes.status = () => mockRes;
-      mockRes.json = (errData) => reject(new Error(errData.message || "PDF Generation failed"));
-      
-      await generateQuotationPDF(quotation, mockRes);
+      // 🔥 Call the Advanced Puppeteer PDF Generator WITH the template name
+      await generateQuotationPDF(quotation, mockRes, templateName);
     } catch (error) {
       reject(error);
     }
@@ -39,18 +38,28 @@ const createPDFBuffer = async (quotation) => {
  * 📲 Send Quotation via WhatsApp Message
  * @param {string} toClientNumber - Client's WhatsApp Number (e.g., 'whatsapp:+919876543210')
  * @param {Object} quotation - Quotation Document
+ * @param {String} templateName - The chosen template design
  */
-export const sendQuotationWhatsApp = async (toClientNumber, quotation) => {
+export const sendQuotationWhatsApp = async (toClientNumber, quotation, templateName = 'classic') => {
   try {
     const refNo = quotation.projectDetails?.referenceNo || "Draft";
     const companyName = quotation.projectDetails?.companyName || "Our Company";
     
-    // PDF Link (Twilio requires a public URL for attachments, not raw buffers)
-    // IMPORTANT: For WhatsApp PDF attachments, you need a public URL where the PDF is hosted.
-    // If you don't have public URL storage (like AWS S3), you can send the Frontend Preview Link instead.
-    const documentLink = `${process.env.FRONTEND_URL}/preview/${quotation._id}`;
+    // 💡 NOTE: Twilio requires a public URL for PDF attachments.
+    // If you integrate AWS S3 / Cloudinary later, you can uncomment the below line,
+    // upload the buffer, and send the returned public link as 'mediaUrl' in Twilio.
+    // const pdfBuffer = await createPDFBuffer(quotation, templateName); 
 
-    const messageBody = `Hello from *${companyName}*! 👋\n\nYour quotation (Ref: #${refNo}) is ready.\n\nGrand Total: *Rs. ${Number(quotation.pricing?.grandTotal || 0).toLocaleString('en-IN')}*\n\nYou can view and download your professional PDF document here:\n🔗 ${documentLink}\n\nLet us know if you have any questions!`;
+    // For now, we share the direct Frontend Preview Link
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const documentLink = `${frontendUrl}/preview/${quotation._id}`;
+
+    const grandTotal = Number(quotation.pricing?.grandTotal || 0).toLocaleString('en-IN', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+
+    const messageBody = `Hello from *${companyName}*! 👋\n\nYour quotation (Ref: #${refNo}) is ready.\n\nGrand Total: *Rs. ${grandTotal}*\n\nYou can view and download your professional PDF document here:\n🔗 ${documentLink}\n\nLet us know if you have any questions!`;
 
     // Send Message via Twilio
     const message = await client.messages.create({
