@@ -9,10 +9,13 @@ import {
   Loader2, ArrowLeft, CheckCircle2, AlertCircle 
 } from "lucide-react";
 
+// 🔥 Set your backend base URL for images here
+const IMG_BASE_URL = "http://localhost:5000/";
+
 export default function EditProfile({
   user,
   setUser, // To update global state in App.jsx
-  goBack,  // 🔥 NEW: Received from App.jsx to handle the back button
+  goBack,  // Received from App.jsx to handle the back button
 }) {
   // States for API handling
   const [isLoading, setIsLoading] = useState(false);
@@ -31,9 +34,16 @@ export default function EditProfile({
     previewUrl: "",   
   });
 
-  // ✅ 1. LOAD USER DATA INTO FORM
+  // ✅ 1. LOAD USER DATA INTO FORM (With Image Path Fix)
   useEffect(() => {
     if (user) {
+      // Construct full URL if profilePic exists and isn't already a base64 string
+      const fullImageUrl = user.profilePic 
+        ? (user.profilePic.startsWith('data:') || user.profilePic.startsWith('http') 
+            ? user.profilePic 
+            : `${IMG_BASE_URL}${user.profilePic}`)
+        : "";
+
       setUserForm({
         name: user.name || "",
         mobile: user.mobile || "",
@@ -41,7 +51,7 @@ export default function EditProfile({
         designation: user.designation || "",
         location: user.location || "",
         bio: user.bio || "",
-        previewUrl: user.profilePic || "", 
+        previewUrl: fullImageUrl, 
         profilePic: null,
       });
     }
@@ -93,7 +103,6 @@ export default function EditProfile({
       }
     } catch (error) {
       console.error("Profile update error:", error);
-      // Detailed error message from backend if available
       const msg = error.response?.data?.message || "Server connection failed.";
       setErrorMsg(msg);
     } finally {
@@ -181,9 +190,7 @@ export default function EditProfile({
               />
 
             </div>
-
           </form>
-
         </div>
       </div>
     </div>

@@ -49,40 +49,48 @@ export default function GroupedTemplate({ data }) {
     : [{ title: "Project Breakdown", items: quote.items || [], sectionTotal: quote.subtotal }];
 
   return (
-    <div className="bg-white p-12 min-h-[297mm] text-gray-900 font-serif border border-gray-100 shadow-sm relative">
+    <div className="bg-white p-10 sm:p-14 min-h-[297mm] text-slate-900 font-serif shadow-sm relative border-t-[16px] border-slate-900">
       
-      {/* 🏢 TOP HEADER */}
-      <div className="text-center border-b-2 border-gray-800 pb-6 mb-8 print-avoid-break">
+      {/* 🏢 TOP HEADER (Executive Letterhead) */}
+      <div className="text-center border-b-[3px] border-slate-900 pb-8 mb-10 print-avoid-break">
         {quote.companyLogo && (
-          <img src={quote.companyLogo} alt="Logo" className="h-16 mx-auto mb-3 object-contain" />
+          <img src={quote.companyLogo} alt="Company Logo" className="h-16 mx-auto mb-4 object-contain rounded-md" />
         )}
-        <h1 className="text-3xl font-black uppercase tracking-wider text-gray-900">{quote.companyName}</h1>
-        <p className="text-sm font-sans text-gray-600 mt-1">{quote.companyPhone} | {quote.companyEmail}</p>
+        <h1 className="text-3xl font-black uppercase tracking-[0.15em] text-slate-900">{quote.companyName}</h1>
+        <p className="text-[11px] font-sans font-bold tracking-widest text-slate-500 mt-2 uppercase">
+          {quote.companyPhone} <span className="mx-2 text-slate-300">|</span> {quote.companyEmail}
+        </p>
       </div>
 
-      {/* ✉️ LETTER HEAD FORMAT */}
-      <div className="mb-8 font-sans print-avoid-break">
-        <div className="flex justify-between items-center mb-6">
-          <p className="font-bold">Date: {quote.date}</p>
-          <p className="font-bold text-gray-500">Ref: {quote.quotationNo}</p>
+      {/* ✉️ LETTER META FORMAT */}
+      <div className="mb-10 font-sans print-avoid-break">
+        <div className="flex justify-between items-center mb-8 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-4">
+          <p>Date: <span className="text-slate-900 ml-1">{quote.date}</span></p>
+          <p>Ref: <span className="text-slate-900 ml-1">{quote.quotationNo}</span></p>
         </div>
         
-        <p className="mb-3">Dear Sir/Madam,</p>
-        <p className="font-bold underline underline-offset-4 mb-4 leading-relaxed">
-          Subject: Paint & Work Quote for {quote.clientName}, {quote.clientAddress}
-        </p>
-        <p className="text-sm text-gray-700">
-          Thank you for your purchase enquiry for the above-mentioned site. Please find below our quotation for Material & Labour for this site.
-        </p>
+        <div className="font-serif text-[15px] leading-relaxed text-slate-800">
+          <p className="mb-4 font-bold text-slate-900">Dear Sir/Madam,</p>
+          
+          <div className="bg-slate-50 p-4 border-l-4 border-slate-900 mb-6 font-sans">
+            <p className="font-bold text-sm text-slate-900 leading-relaxed uppercase tracking-wide">
+              <span className="text-slate-500 mr-2">Subject:</span> Paint & Work Quote for {quote.clientName}, {quote.clientAddress}
+            </p>
+          </div>
+          
+          <p className="text-sm text-slate-700 font-medium">
+            Thank you for your purchase enquiry for the above-mentioned site. Please find below our quotation for Material & Labour for this site.
+          </p>
+        </div>
       </div>
 
-      {/* 📋 SECTIONS (Mani Sir Style Logic adapted for multiple categories) */}
-      <div className="space-y-12 mb-10">
+      {/* 📋 SECTIONS (Detailed Breakdown) */}
+      <div className="space-y-12 mb-12">
         {sectionsToRender.map((section, secIdx) => (
           <div key={secIdx}>
             
             {/* Section Category Title */}
-            <h2 className="text-lg font-black uppercase text-gray-900 border-b-2 border-gray-800 pb-2 mb-6 print-avoid-break">
+            <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 border-b-2 border-slate-300 pb-2 mb-6 font-sans print-avoid-break">
               {section.title}
             </h2>
 
@@ -91,40 +99,40 @@ export default function GroupedTemplate({ data }) {
                 <div key={index} className="print-avoid-break">
                   
                   {/* Item Description as Sub-heading */}
-                  <h3 className="text-sm font-bold text-gray-900 mb-2 border-l-4 border-gray-800 pl-3 bg-gray-50 py-1.5 whitespace-pre-wrap">
+                  <h3 className="text-[13px] font-bold text-slate-900 mb-3 border-l-[3px] border-slate-800 pl-3 bg-slate-50/50 py-2 whitespace-pre-wrap font-sans uppercase tracking-wide">
                     {item.desc}
                   </h3>
                   
                   {/* Minimalist Table for Labour/Material Split */}
-                  <table className="w-full border border-gray-300 font-sans text-sm">
+                  <table className="w-full border border-slate-200 font-sans text-xs">
                     <thead>
-                      <tr className="bg-gray-100/50 border-b border-gray-300">
-                        <th className="p-3 text-left font-bold text-gray-700 w-2/3">Work & Material Breakdown</th>
-                        <th className="p-3 text-right font-bold text-gray-700 w-1/3">Amount (Rs)</th>
+                      <tr className="bg-slate-100/50 border-b border-slate-200">
+                        <th className="py-2.5 px-4 text-left font-bold text-slate-500 uppercase tracking-widest w-2/3">Work & Material Breakdown</th>
+                        <th className="py-2.5 px-4 text-right font-bold text-slate-500 uppercase tracking-widest w-1/3">Amount (Rs)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-gray-200">
-                        <td className="p-3 text-gray-600 align-top">
-                          <p className="mb-1"><span className="font-semibold text-gray-800">Labour Cost:</span> Surface preparation, crack filling, and application.</p>
+                      <tr className="border-b border-slate-100">
+                        <td className="py-3 px-4 text-slate-600 align-top">
+                          <p className="mb-0.5"><span className="font-bold text-slate-800 uppercase text-[10px] tracking-wider mr-2">Labour Cost:</span> Surface preparation, crack filling, and application.</p>
                         </td>
-                        <td className="p-3 text-right text-gray-800 font-medium align-top">
+                        <td className="py-3 px-4 text-right text-slate-700 font-semibold align-top">
                           {safeFormat(item.labour)}
                         </td>
                       </tr>
-                      <tr className="border-b border-gray-200">
-                        <td className="p-3 text-gray-600 align-top">
-                          <p><span className="font-semibold text-gray-800">Material Cost:</span> Primers, Emulsions, and related accessories.</p>
+                      <tr className="border-b border-slate-200">
+                        <td className="py-3 px-4 text-slate-600 align-top">
+                          <p><span className="font-bold text-slate-800 uppercase text-[10px] tracking-wider mr-2">Material Cost:</span> Primers, Emulsions, and related accessories.</p>
                         </td>
-                        <td className="p-3 text-right text-gray-800 font-medium align-top">
+                        <td className="py-3 px-4 text-right text-slate-700 font-semibold align-top">
                           {safeFormat(item.material)}
                         </td>
                       </tr>
-                      <tr className="bg-gray-50">
-                        <td className="p-3 text-right font-bold text-gray-800 italic">
+                      <tr className="bg-slate-50/80">
+                        <td className="py-3 px-4 text-right font-bold text-slate-600 uppercase tracking-widest text-[10px]">
                           Total Estimated Cost for this item =
                         </td>
-                        <td className="p-3 text-right font-bold text-gray-900">
+                        <td className="py-3 px-4 text-right font-black text-slate-900 text-sm">
                           {safeFormat(item.total)}
                         </td>
                       </tr>
@@ -135,60 +143,63 @@ export default function GroupedTemplate({ data }) {
             </div>
 
             {/* Category Subtotal */}
-            <div className="mt-4 text-right print-avoid-break">
-              <p className="text-sm font-bold text-gray-700 uppercase tracking-widest">
-                {section.title} Total: <span className="text-gray-900 ml-4">Rs. {safeFormat(section.sectionTotal)}</span>
+            <div className="mt-5 text-right print-avoid-break bg-slate-100/50 py-3 px-4 rounded-lg border border-slate-200 inline-block float-right">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest font-sans">
+                {section.title} Total: <span className="text-slate-900 ml-4 font-black text-sm">Rs. {safeFormat(section.sectionTotal)}</span>
               </p>
             </div>
+            <div className="clear-both"></div>
             
           </div>
         ))}
       </div>
 
-      {/* 💰 GRAND TOTAL (Prominent Text) */}
-      <div className="mb-10 text-right print-avoid-break">
+      {/* 💰 GRAND TOTAL (Executive Impact) */}
+      <div className="mb-14 text-right print-avoid-break font-sans">
         {Number(quote.discount) > 0 && (
-          <p className="text-sm text-green-700 font-bold mb-1">Discount: - Rs. {safeFormat(quote.discount)}</p>
+          <p className="text-[11px] text-emerald-600 font-bold uppercase tracking-widest mb-1.5">Discount: - Rs. {safeFormat(quote.discount)}</p>
         )}
         {Number(quote.tax) > 0 && (
-          <p className="text-sm text-gray-600 mb-1">Tax: Rs. {safeFormat(quote.tax)}</p>
+          <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mb-2">Tax: Rs. {safeFormat(quote.tax)}</p>
         )}
-        <h2 className="text-xl font-bold text-gray-900 border-y-2 border-gray-800 py-3 inline-block pl-8 pr-4 bg-gray-50">
-          Total Working Cost = Rs. {safeFormat(quote.grandTotal)}
-        </h2>
+        <div className="border-y-4 border-slate-900 py-4 mt-2 bg-slate-50 inline-block px-8 rounded-sm">
+           <h2 className="text-lg font-black text-slate-900 uppercase tracking-widest">
+             Total Working Cost <span className="text-slate-400 font-normal mx-3">=</span> Rs. {safeFormat(quote.grandTotal)}
+           </h2>
+        </div>
       </div>
 
       {/* 📜 TERMS & CONDITIONS */}
-      <div className="mb-10 font-sans print-avoid-break">
-        <h4 className="text-sm font-bold text-gray-900 mb-3 underline underline-offset-4">Terms and Conditions</h4>
-        <ul className="text-sm text-gray-700 space-y-2">
+      <div className="mb-12 font-sans print-avoid-break">
+        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-4 border-b border-slate-200 pb-2 inline-block">Terms and Conditions</h4>
+        <ul className="text-xs text-slate-600 space-y-2.5 font-medium leading-relaxed">
           {quote.terms && quote.terms.map((term, i) => (
-             <li key={i} className="flex items-start gap-2">
-               <span className="font-bold text-gray-900">{i + 1}.</span> {term}
+             <li key={i} className="flex items-start gap-3">
+               <span className="font-black text-slate-400">{i + 1}.</span> {term}
              </li>
           ))}
         </ul>
       </div>
 
       {/* 🏦 BANK DETAILS & SIGNATURE (Side by Side) */}
-      <div className="flex flex-col md:flex-row justify-between items-end mt-12 pt-8 border-t border-gray-200 font-sans print-avoid-break">
+      <div className="flex flex-col md:flex-row justify-between items-end mt-12 pt-8 border-t-2 border-slate-100 font-sans print-avoid-break">
         
         <div className="w-full md:w-1/2 mb-8 md:mb-0">
-           <h4 className="text-sm font-bold text-gray-900 mb-2">Bank Account Details:</h4>
-           <div className="text-sm text-gray-700 space-y-1">
-             <p><span className="font-semibold text-gray-800 w-24 inline-block">Bank Name:</span> {quote.bankDetails?.bankName || "-"}</p>
-             <p><span className="font-semibold text-gray-800 w-24 inline-block">A/c No:</span> {quote.bankDetails?.accNo || "-"}</p>
-             <p><span className="font-semibold text-gray-800 w-24 inline-block">IFSC Code:</span> {quote.bankDetails?.ifsc || "-"}</p>
+           <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] mb-4">Bank Account Details</h4>
+           <div className="text-[11px] text-slate-700 space-y-2 bg-slate-50 p-5 rounded-xl border border-slate-200">
+             <p className="flex justify-between border-b border-slate-200 pb-1.5"><span className="font-bold text-slate-500 uppercase tracking-wider">Bank Name:</span> <span className="font-black text-slate-900">{quote.bankDetails?.bankName || "-"}</span></p>
+             <p className="flex justify-between border-b border-slate-200 pb-1.5"><span className="font-bold text-slate-500 uppercase tracking-wider">A/c No:</span> <span className="font-black text-slate-900 tracking-widest">{quote.bankDetails?.accNo || "-"}</span></p>
+             <p className="flex justify-between border-b border-slate-200 pb-1.5"><span className="font-bold text-slate-500 uppercase tracking-wider">IFSC Code:</span> <span className="font-black text-slate-900 tracking-widest">{quote.bankDetails?.ifsc || "-"}</span></p>
              {quote.bankDetails?.accHolder && (
-               <p><span className="font-semibold text-gray-800 w-24 inline-block">Name:</span> {quote.bankDetails.accHolder}</p>
+               <p className="flex justify-between pt-1"><span className="font-bold text-slate-500 uppercase tracking-wider">Name:</span> <span className="font-black text-slate-900">{quote.bankDetails.accHolder}</span></p>
              )}
            </div>
         </div>
 
-        <div className="w-full md:w-1/2 text-right">
-           <p className="text-sm text-gray-600 italic mb-12">With Regards,</p>
-           <h4 className="text-lg font-bold text-gray-900">{quote.companyName}</h4>
-           <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Authorized Signatory</p>
+        <div className="w-full md:w-1/2 text-right flex flex-col items-end">
+           <p className="text-xs text-slate-500 italic mb-14 font-serif">With Regards,</p>
+           <h4 className="text-base font-black text-slate-900 uppercase tracking-wider">{quote.companyName}</h4>
+           <p className="text-[10px] text-slate-400 mt-1.5 uppercase tracking-[0.2em] font-bold">Authorized Signatory</p>
         </div>
       </div>
 

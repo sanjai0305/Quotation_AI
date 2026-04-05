@@ -7,12 +7,15 @@ import {
   CreditCard as SubscriptionIcon,
   LifeBuoy as HelpIcon,
   Settings as SettingsIcon,
-  LogOut as LogOutIcon, // Added for the Modal
+  LogOut as LogOutIcon, 
   AlertTriangle 
 } from "lucide-react";
 
 // 🔥 IMPORT PROFILE SECTION
 import ProfileSection from "../../components/profile/ProfileSection"; 
+
+// 🔥 BACKEND URL FOR IMAGES
+const IMG_BASE_URL = "http://localhost:5000/";
 
 export default function Sidebar({
   active = "dashboard",
@@ -41,13 +44,23 @@ export default function Sidebar({
     window.location.href = "/"; 
   };
 
+  // 🔥 THE FIX: Process the user object to ensure the profilePic has the correct full URL
+  const displayUser = user ? {
+    ...user,
+    profilePic: user.profilePic
+      ? (user.profilePic.startsWith('data:') || user.profilePic.startsWith('http')
+          ? user.profilePic
+          : `${IMG_BASE_URL}${user.profilePic}`)
+      : null
+  } : null;
+
   return (
     <>
       <div className="w-[250px] bg-[#0B1120] text-slate-300 h-screen p-5 flex flex-col justify-between fixed left-0 top-0 border-r border-slate-800/60 shadow-2xl z-50">
 
         {/* TOP SECTION: LOGO & MENU */}
         <div>
-          {/* 🔥 CUSTOM VISION X LOGO */}
+          {/* CUSTOM VISION X LOGO */}
           <div 
             onClick={goToDashboard}
             className="flex items-center gap-3 mb-10 px-2 cursor-pointer group"
@@ -136,8 +149,8 @@ export default function Sidebar({
         {/* BOTTOM SECTION: USER PROFILE */}
         <div className="mt-auto pt-5 border-t border-slate-800/60">
           <ProfileSection 
-            user={user} 
-            onLogout={handleLogoutTrigger} // Use trigger instead of handleLogout
+            user={displayUser} // 🔥 PASSING THE FIXED USER OBJECT HERE
+            onLogout={handleLogoutTrigger} 
             goToSettings={goToSettings} 
             goToEditProfile={goToEditProfile} 
           />
@@ -145,7 +158,7 @@ export default function Sidebar({
       </div>
 
       {/* =========================================
-          🔥 CUSTOM LOGOUT MODAL (ENGLISH UI)
+          🔥 CUSTOM LOGOUT MODAL 
           ========================================= */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

@@ -14,16 +14,21 @@ const rateItemSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+      // 🔥 FIX: Intercepts negative values and forces them to 0 before saving
+      set: (val) => Math.max(0, val || 0), 
     },
     material: {
       type: Number,
       default: 0,
       min: 0,
+      // 🔥 FIX: Intercepts negative values
+      set: (val) => Math.max(0, val || 0),
     },
     total: {
       type: Number,
       default: 0,
       min: 0,
+      set: (val) => Math.max(0, val || 0),
     },
   },
   { _id: false }
@@ -106,10 +111,31 @@ const quotationSchema = new mongoose.Schema(
 
     // 💰 PRICING
     pricing: {
-      subtotal: { type: Number, default: 0, min: 0 },
-      discount: { type: Number, default: 0, min: 0, max: 100 }, 
-      tax: { type: Number, default: 0, min: 0 }, // Optional tax field
-      grandTotal: { type: Number, default: 0, min: 0 },
+      subtotal: { 
+        type: Number, 
+        default: 0, 
+        min: 0,
+        set: (val) => Math.max(0, val || 0)
+      },
+      discount: { 
+        type: Number, 
+        default: 0, 
+        min: 0, 
+        max: 100,
+        set: (val) => Math.max(0, Math.min(100, val || 0)) // Keeps it between 0 and 100
+      }, 
+      tax: { 
+        type: Number, 
+        default: 0, 
+        min: 0,
+        set: (val) => Math.max(0, val || 0)
+      }, 
+      grandTotal: { 
+        type: Number, 
+        default: 0, 
+        min: 0,
+        set: (val) => Math.max(0, val || 0)
+      },
       warranty: { type: String, default: "" }, 
     },
 
@@ -187,8 +213,9 @@ const calculateTotals = (doc) => {
       let sectionRateTotal = 0;
 
       section.rows.forEach((item) => {
-        const labour = Number(item.labour || 0);
-        const material = Number(item.material || 0);
+        // Safe number parsing
+        const labour = Math.max(0, Number(item.labour || 0));
+        const material = Math.max(0, Number(item.material || 0));
         const total = labour + material;
 
         sectionRateTotal += total;
@@ -206,8 +233,8 @@ const calculateTotals = (doc) => {
   // 🔄 2. Fallback Calculation for OLD Single Table Format
   else if (doc.rateTable && doc.rateTable.length > 0) {
     doc.rateTable.forEach((item) => {
-      const labour = Number(item.labour || 0);
-      const material = Number(item.material || 0);
+      const labour = Math.max(0, Number(item.labour || 0));
+      const material = Math.max(0, Number(item.material || 0));
       const total = labour + material;
 
       subtotal += total;
@@ -218,9 +245,9 @@ const calculateTotals = (doc) => {
     });
   }
 
-  const discountPercent = Number(doc.pricing?.discount || 0);
+  const discountPercent = Math.max(0, Number(doc.pricing?.discount || 0));
   const discountAmount = (subtotal * discountPercent) / 100;
-  const taxAmount = Number(doc.pricing?.tax || 0);
+  const taxAmount = Math.max(0, Number(doc.pricing?.tax || 0));
 
   if (!doc.pricing) doc.pricing = {};
   doc.pricing.subtotal = subtotal;

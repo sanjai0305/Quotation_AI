@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Sidebar from "./Sidebar";
+import DeleteModal from "../../components/DeleteModal"; // Import the custom Delete Modal
 import { 
   Plus, ArrowRight, FileText, IndianRupee, Clock, 
   TrendingUp, Sparkles, FileSearch, MoreVertical, 
@@ -8,7 +9,7 @@ import {
 } from "lucide-react";
 
 // ==============================
-// 🔥 API SETUP (Axios with Token)
+// API SETUP (Axios with Token)
 // ==============================
 const API = axios.create({
   baseURL: "http://localhost:5000/api/quotations",
@@ -30,34 +31,42 @@ export const updateQuotation = (id, data) => API.put(`/${id}`, data);
 export const deleteQuotation = (id) => API.delete(`/${id}`);
 
 // ==============================
-// 📊 DASHBOARD COMPONENT
+// DASHBOARD COMPONENT
 // ==============================
 export default function Dashboard({
-  user, // 🔥 Received from App.jsx
+  user, 
   goToCreate,
   goToDashboard,
   goToPreview,
   goToExport,
   goToSubscription, 
-  goToSettings, // 🔥 NEW: Added for Sidebar
-  goToHelp,     // 🔥 NEW: Added for Sidebar
+  goToSettings, 
+  goToHelp,     
   goToEditProfile, 
   setQuotationId 
 }) {
+  // Main Data States
   const [stats, setStats] = useState({ total: 0, value: 0, lastCreated: "None" });
   const [recentQuotes, setRecentQuotes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // UI Interaction States
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
   const [openDropdownId, setOpenDropdownId] = useState(null); 
 
+  // Delete Modal States
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Helper to show temporary toast messages
   const showToast = (msg, type = "success") => {
     setToast({ show: true, message: msg, type });
     setTimeout(() => setToast({ show: false, message: "", type: "" }), 3000);
   };
 
   // ==============================
-  // 🔄 FETCH DATA
+  // DATA FETCHING
   // ==============================
   const fetchDashboardData = async () => {
     try {
@@ -69,7 +78,7 @@ export default function Dashboard({
 
       if (statsRes && quotesRes) {
         setStats(statsRes.data);
-        setRecentQuotes(quotesRes.data.slice(0, 8)); 
+        setRecentQuotes(quotesRes.data.slice(0, 8)); // Display only the 8 most recent
       }
     } catch (error) {
       console.error("Backend fetch error:", error);
@@ -82,7 +91,7 @@ export default function Dashboard({
     fetchDashboardData();
   }, []);
 
-  // 🔥 CLOSE DROPDOWN IF CLICKED OUTSIDE
+  // Close dropdown menu if user clicks anywhere outside of it
   useEffect(() => {
     const handleClickOutside = () => setOpenDropdownId(null);
     document.addEventListener("click", handleClickOutside);
@@ -90,22 +99,20 @@ export default function Dashboard({
   }, []);
 
   // ==============================
-  // 🎯 ACTION HANDLERS
+  // ACTION HANDLERS
   // ==============================
   
-  // 🔥 START A NEW QUOTATION
   const handleStartNewQuote = () => {
-    if (setQuotationId) setQuotationId(null); // Clear ID
-    localStorage.removeItem("previewDraft");  // Clear Draft
-    goToCreate();                             // Route to Create Page
+    if (setQuotationId) setQuotationId(null); // Clear active quotation ID
+    localStorage.removeItem("previewDraft");  // Clear any existing draft data
+    goToCreate();                             // Navigate to Create page
   };
 
-  // 🔥 EDIT EXISTING QUOTATION
   const handleEdit = (id, rawData, e) => {
     e.stopPropagation();
-    if(setQuotationId) setQuotationId(id); // Set Active ID
+    if(setQuotationId) setQuotationId(id); 
     if(rawData) {
-      localStorage.setItem("previewDraft", JSON.stringify(rawData)); // Load Data to Draft
+      localStorage.setItem("previewDraft", JSON.stringify(rawData)); 
     }
     goToCreate();
   };
@@ -116,24 +123,33 @@ export default function Dashboard({
     window.open(`http://localhost:5000/api/export/pdf/${id}?token=${token}`, "_blank");
   };
 
-  const handleDelete = async (id, e) => {
+  // Triggers the custom Delete Modal
+  const handleDeleteClick = (quote, e) => {
     e.stopPropagation(); 
-    setOpenDropdownId(null); 
+    setOpenDropdownId(null); // Close the dropdown menu
+    setQuoteToDelete(quote); // Set the target quotation
+    setIsDeleteModalOpen(true); // Open the modal
+  };
+
+  // Executes the actual API deletion call (Triggered from Modal)
+  const executeDelete = async () => {
+    if (!quoteToDelete) return;
     
-    if(!window.confirm("Are you sure you want to delete this quotation permanently?")) return;
-    
-    setRecentQuotes((prev) => prev.filter((q) => q._id !== id));
-    
+    setIsDeleting(true);
     try {
-      const res = await deleteQuotation(id);
+      const res = await deleteQuotation(quoteToDelete._id);
       if (res.data.success) {
+        setRecentQuotes((prev) => prev.filter((q) => q._id !== quoteToDelete._id));
         showToast("Quotation deleted permanently.");
         fetchDashboardData(); 
       }
     } catch (error) {
       console.error("Delete failed:", error);
       showToast("Failed to delete. Backend error.", "error");
-      fetchDashboardData(); 
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteModalOpen(false);
+      setQuoteToDelete(null);
     }
   };
 
@@ -160,8 +176,9 @@ export default function Dashboard({
   };
 
   return (
-    <div className="bg-[#f8fafc] min-h-screen font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className="bg-[#f8fafc] min-h-screen font-sans selection:bg-blue-100 selection:text-blue-900 relative">
       
+      {/* TOAST NOTIFICATION */}
       {toast.show && (
         <div className={`fixed top-20 right-8 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in ${toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
           <CheckCircle2 size={18} />
@@ -169,6 +186,16 @@ export default function Dashboard({
         </div>
       )}
 
+      {/* CUSTOM DELETE MODAL */}
+      <DeleteModal 
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={executeDelete}
+        quoteName={quoteToDelete?.client || "this quotation"}
+        isLoading={isDeleting}
+      />
+
+      {/* SIDEBAR NAVIGATION */}
       <div className="fixed top-0 left-0 h-screen w-[250px] z-30 shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-gray-100">
         <Sidebar 
           active="dashboard" 
@@ -178,14 +205,16 @@ export default function Dashboard({
           goToPreview={goToPreview} 
           goToExport={goToExport} 
           goToSubscription={goToSubscription}
-          goToSettings={goToSettings} // 🔥 PERFECTLY PASSED
-          goToHelp={goToHelp}         // 🔥 PERFECTLY PASSED
+          goToSettings={goToSettings} 
+          goToHelp={goToHelp}         
           goToEditProfile={goToEditProfile} 
         />
       </div>
 
+      {/* MAIN CONTENT AREA */}
       <div className="ml-[250px] h-screen flex flex-col relative">
         
+        {/* TOP HEADER */}
         <div className="flex justify-between items-center px-10 py-5 bg-white/80 backdrop-blur-xl sticky top-0 z-20 border-b border-gray-200/50 shadow-sm">
           <div>
             <h1 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard</h1>
@@ -197,8 +226,10 @@ export default function Dashboard({
           </button>
         </div>
 
+        {/* SCROLLABLE DASHBOARD CONTENT */}
         <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-7xl mx-auto w-full pb-24">
 
+          {/* STATS CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all">
               <div className="flex justify-between items-start">
@@ -236,6 +267,7 @@ export default function Dashboard({
             </div>
           </div>
 
+          {/* RECENT QUOTATIONS TABLE */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-visible relative">
             
             <div className="flex justify-between items-center p-6 border-b border-gray-100">
@@ -306,8 +338,10 @@ export default function Dashboard({
                                     >
                                       <SaveIcon className="w-4 h-4" /> Permanent Save
                                     </button>
+                                    
+                                    {/* DELETE TRIGGER */}
                                     <button 
-                                      onClick={(e) => handleDelete(quote._id, e)}
+                                      onClick={(e) => handleDeleteClick(quote, e)}
                                       className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold flex items-center gap-2 transition-colors"
                                     >
                                       <Trash2 className="w-4 h-4" /> Delete Quotation
@@ -325,6 +359,7 @@ export default function Dashboard({
                 </table>
               </div>
             ) : (
+              // EMPTY STATE
               <div className="p-12 flex flex-col items-center justify-center text-center">
                 <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mb-5 border-8 border-white shadow-sm">
                   <FileSearch className="w-8 h-8 text-blue-500" />

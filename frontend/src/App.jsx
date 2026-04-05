@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
-import ResetPassword from "./pages/auth/ResetPassword"; // 🔥 ADDED THIS IMPORT
+import ResetPassword from "./pages/auth/ResetPassword"; 
 
 // 📊 DASHBOARD PAGES
 import Dashboard from "./pages/dashboard/Dashboard";
@@ -13,47 +13,48 @@ import Preview from "./pages/dashboard/Preview";
 import Export from "./pages/dashboard/Export";
 import EditProfile from "./pages/dashboard/EditProfile"; 
 
-// 🔥 SETTINGS & HELP PAGES
+// ⚙️ SETTINGS & HELP PAGES
 import Settings from "./pages/dashboard/Settings";
 import HelpSupport from "./pages/dashboard/HelpSupport";
 
-// 🔥 MASTER SUBSCRIPTION PAGE
+// 💎 MASTER SUBSCRIPTION PAGE
 import Subscription from "./pages/dashboard/Subscription";
 
 export default function App() {
   const [page, setPage] = useState("loading");
   const [quotationId, setQuotationId] = useState(null);
   const [user, setUser] = useState(null); 
-  const [resetToken, setResetToken] = useState(null); // 🔥 ADDED STATE FOR TOKEN
+  const [resetToken, setResetToken] = useState(null); 
 
   // ==========================================
-  // 🔥 URL ROUTING & AUTH CHECK
+  // 🔄 URL ROUTING & AUTH CHECK
   // ==========================================
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user"); 
     const path = window.location.pathname;
 
+    // 1. Parse User Data Safely
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
       } catch (error) {
-        console.error("Failed to parse user data");
+        console.error("Failed to parse user data. Clearing corrupted data.");
         localStorage.removeItem("user");
       }
     }
 
-    // 1. PUBLIC Reset Password Link Check 🔥 (Added this block)
+    // 2. PUBLIC ROUTE: Reset Password Link Check
     if (path.startsWith("/reset-password/")) {
       const tokenFromUrl = path.split("/")[2]; // Extracts token from /reset-password/TOKEN
       if (tokenFromUrl) {
         setResetToken(tokenFromUrl);
         setPage("reset-password");
-        return; // Stop further checks, let them reset the password
+        return; 
       }
     }
 
-    // 2. PUBLIC Preview Link Check
+    // 3. PUBLIC ROUTE: External Preview Link Check
     if (path.startsWith("/preview/")) {
       const idFromUrl = path.split("/")[2]; 
       if (idFromUrl && idFromUrl.length === 24) {
@@ -63,7 +64,7 @@ export default function App() {
       }
     }
 
-    // 3. Standard Auth Check
+    // 4. PROTECTED ROUTES: Standard Auth Check
     if (token) {
       if (path.includes("/subscription")) setPage("subscription");
       else if (path.includes("/edit-profile")) setPage("edit-profile");
@@ -74,12 +75,13 @@ export default function App() {
       else if (path.includes("/export")) setPage("export");
       else setPage("dashboard");
     } else {
-      setPage("login"); // Fallback for unauthenticated users
+      // Fallback for unauthenticated users
+      setPage("login"); 
     }
   }, []);
 
   // ==========================================
-  // 🧭 NAVIGATION HANDLERS
+  // 🧭 NAVIGATION HANDLERS (Props passed to children)
   // ==========================================
   const navProps = {
     goToDashboard: () => {
@@ -87,6 +89,7 @@ export default function App() {
       setPage("dashboard");
     },
 
+    // 🔥 CREATE QUOTE LOGIC (With Trial & Subscription Checks)
     goToCreate: () => {
       const now = new Date();
       const trialDate = user?.trialExpiresAt ? new Date(user.trialExpiresAt) : null;
@@ -94,20 +97,24 @@ export default function App() {
       const isTrialUsedBefore = user?.isTrialUsed; 
 
       if (isSubscribed) {
+        // User has an active Standard or Pro Plan
         window.history.pushState({}, "", "/create");
         setPage("create");
       } 
-      else if (isTrialUsedBefore) {
-        alert("Trial limit reached! 🚨 Please subscribe to continue.");
+      else if (isTrialUsedBefore && (!trialDate || trialDate < now)) {
+        // Trial has been used and is currently expired
+        alert("🚨 Your 1-Month Free Trial has expired. Please upgrade to the Standard or Pro plan to continue creating quotations.");
         window.history.pushState({}, "", "/subscription");
         setPage("subscription");
       }
       else if (trialDate && trialDate < now) {
-        alert("Trial period expired! ⏳ Please subscribe to continue.");
+        // Trial period time has elapsed
+        alert("⏳ Your Free Trial period has ended. Please choose a subscription plan to continue.");
         window.history.pushState({}, "", "/subscription");
         setPage("subscription");
       } 
       else {
+        // User is still within their free trial period
         window.history.pushState({}, "", "/create");
         setPage("create");
       }
@@ -144,6 +151,7 @@ export default function App() {
     }
   };
 
+  // Prevent rendering empty screen while validating auth state
   if (page === "loading") return null; 
 
   return (
@@ -163,10 +171,8 @@ export default function App() {
 
       {page === "register" && <Register goToLogin={() => setPage("login")} />}
       
-      {/* Ask for Email Page */}
       {page === "forgot" && <ForgotPassword goToLogin={() => setPage("login")} />}
       
-      {/* 🔥 NEW: Actual Reset Password Page (User lands here from email link) */}
       {page === "reset-password" && (
         <ResetPassword 
           token={resetToken} 
@@ -177,16 +183,21 @@ export default function App() {
         />
       )}
 
-      {/* 📊 DASHBOARD ROUTES */}
+      {/* 📊 PROTECTED DASHBOARD ROUTES */}
       {page === "dashboard" && (
         <Dashboard {...navProps} user={user} setQuotationId={setQuotationId} />
       )}
 
       {page === "create" && (
-        <CreateQuotation {...navProps} user={user} goBack={navProps.goToDashboard} setQuotationId={setQuotationId} quotationId={quotationId} />
+        <CreateQuotation 
+          {...navProps} 
+          user={user} 
+          goBack={navProps.goToDashboard} 
+          setQuotationId={setQuotationId} 
+          quotationId={quotationId} 
+        />
       )}
 
-      {/* 🔥 UPDATED PREVIEW ROUTE */}
       {page === "preview" && (
         <Preview 
           {...navProps} 
@@ -197,15 +208,18 @@ export default function App() {
       )}
 
       {page === "export" && (
-        <Export {...navProps} user={user} goBack={navProps.goToPreview} quotationId={quotationId} />
+        <Export 
+          {...navProps} 
+          user={user} 
+          goBack={navProps.goToPreview} 
+          quotationId={quotationId} 
+        />
       )}
 
-      {/* 🔥 SUBSCRIPTION */}
       {page === "subscription" && (
         <Subscription {...navProps} user={user} />
       )}
 
-      {/* 👤 EDIT PROFILE */}
       {page === "edit-profile" && (
         <EditProfile 
           {...navProps} 
@@ -215,12 +229,10 @@ export default function App() {
         />
       )}
 
-      {/* ⚙️ SETTINGS */}
       {page === "settings" && (
         <Settings {...navProps} user={user} />
       )}
 
-      {/* ❓ HELP & SUPPORT */}
       {page === "help" && (
         <HelpSupport {...navProps} user={user} />
       )}

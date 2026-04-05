@@ -48,9 +48,14 @@ router.get("/pdf/public/:id", async (req, res) => {
       });
     }
 
-    const fileName = quotation.projectDetails?.clientName 
-      ? `Quotation_${quotation.projectDetails.clientName.replace(/\s+/g, '_')}.pdf` 
-      : 'Quotation_Document.pdf';
+    // 🔥 SYNCED SMART FILENAME LOGIC (Matches the Controller)
+    const clientName = quotation.projectDetails?.clientName || "Document";
+    const quoteNo = quotation.projectDetails?.referenceNo || "Shared";
+    
+    const safeClientName = clientName.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");
+    const safeQuoteNo = quoteNo.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");
+
+    const fileName = `Quotation_${safeQuoteNo}_${safeClientName}.pdf`;
 
     // 🔥 'inline' disposition: PDF ஆட்டோமேட்டிக்காக டவுன்லோட் ஆகாமல் பிரவுசரில் Preview ஆக ஓபன் ஆகும்.
     res.setHeader("Content-Type", "application/pdf");

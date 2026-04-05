@@ -47,9 +47,9 @@ export default function CreativeTemplate({ data }) {
   };
 
   return (
-    <div className="bg-white min-h-[297mm] text-gray-800 font-sans relative overflow-hidden">
+    <div className="bg-white min-h-[297mm] text-slate-800 font-sans relative overflow-hidden shadow-sm border border-slate-100">
       
-      {/* 🎨 BACKGROUND DECORATIVE ELEMENTS (Creative Touch) */}
+      {/* 🎨 BACKGROUND DECORATIVE ELEMENTS (Hidden in print for clean PDF) */}
       <div className="absolute top-[-150px] right-[-150px] w-[500px] h-[500px] bg-gradient-to-br from-purple-400 to-fuchsia-400 rounded-full opacity-10 blur-[80px] pointer-events-none print:hidden"></div>
       <div className="absolute bottom-[-100px] left-[-100px] w-[300px] h-[300px] bg-gradient-to-tr from-blue-400 to-emerald-400 rounded-full opacity-10 blur-[60px] pointer-events-none print:hidden"></div>
 
@@ -57,21 +57,21 @@ export default function CreativeTemplate({ data }) {
       <div className="flex flex-col md:flex-row min-h-[220px] print-avoid-break">
         
         {/* Left: Branding Block */}
-        <div className="bg-gray-900 text-white p-10 flex-1 rounded-br-[80px] relative overflow-hidden shadow-xl z-10 print:!bg-gray-900 print:!text-white">
+        <div className="bg-slate-900 text-white p-10 flex-1 rounded-br-[80px] relative overflow-hidden shadow-xl z-10 print:!bg-slate-900 print:!text-white">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
           
           <div className="flex items-center gap-4 mb-6">
             {quote.companyLogo ? (
-              <img src={quote.companyLogo} alt="Logo" className="w-14 h-14 object-contain rounded-2xl bg-white p-1 shadow-lg" />
+              <img src={quote.companyLogo} alt="Logo" className="w-14 h-14 object-contain rounded-xl bg-white p-1 shadow-lg" />
             ) : (
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-fuchsia-500 rounded-2xl flex items-center justify-center text-white shadow-lg print:border print:border-gray-700">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-fuchsia-500 rounded-xl flex items-center justify-center text-white shadow-lg print:border print:border-slate-700">
                  <Palette size={24} />
               </div>
             )}
             <h1 className="text-3xl font-black tracking-tight">{quote.companyName}</h1>
           </div>
 
-          <div className="space-y-1.5 text-gray-300 text-sm font-medium">
+          <div className="space-y-1.5 text-slate-300 text-xs font-medium tracking-wide">
             <p className="flex items-center gap-2"><Phone size={14} className="text-purple-400"/> {quote.companyPhone}</p>
             <p className="flex items-center gap-2"><Mail size={14} className="text-fuchsia-400"/> {quote.companyEmail}</p>
           </div>
@@ -79,30 +79,30 @@ export default function CreativeTemplate({ data }) {
 
         {/* Right: Quote Meta */}
         <div className="p-10 flex-1 flex flex-col justify-center items-end text-right z-10">
-          <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-fuchsia-600 tracking-tighter uppercase mb-4 print:text-purple-700">
+          <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-fuchsia-600 tracking-tighter uppercase mb-5 print:text-purple-700 print:bg-none">
             Estimate
           </h2>
           <div className="space-y-1">
-            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Quote No.</p>
-            <p className="text-lg font-black text-gray-800">{quote.quotationNo}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quote No.</p>
+            <p className="text-lg font-black text-slate-800">{quote.quotationNo}</p>
           </div>
           <div className="space-y-1 mt-4">
-            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Date</p>
-            <p className="text-sm font-bold text-gray-800">{quote.date}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</p>
+            <p className="text-sm font-bold text-slate-800">{quote.date}</p>
           </div>
         </div>
       </div>
 
-      <div className="px-10 pb-10 pt-4 relative z-10">
+      <div className="px-10 pb-10 pt-6 relative z-10">
         
         {/* 👤 CLIENT DETAILS (Floating Card) */}
-        <div className="bg-white/60 backdrop-blur-sm border border-gray-100 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-10 inline-block min-w-[300px] print-avoid-break">
-          <p className="text-xs font-black text-purple-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-            <Sparkles size={14}/> Prepared For
+        <div className="bg-slate-50/80 backdrop-blur-sm border border-slate-100 p-6 rounded-3xl mb-10 inline-block min-w-[300px] print-avoid-break">
+          <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+            <Sparkles size={14} strokeWidth={2.5} /> Prepared For
           </p>
-          <h3 className="text-2xl font-black text-gray-900 mb-2">{quote.clientName}</h3>
-          <p className="text-sm text-gray-500 font-medium flex items-start gap-1.5 max-w-sm">
-             <MapPin size={16} className="shrink-0 mt-0.5 text-gray-400"/> {quote.clientAddress}
+          <h3 className="text-xl font-black text-slate-900 mb-1 uppercase tracking-wide">{quote.clientName}</h3>
+          <p className="text-[11px] font-bold text-slate-500 flex items-start gap-1.5 max-w-sm">
+             <MapPin size={14} className="shrink-0 mt-0.5 text-slate-400"/> {quote.clientAddress}
           </p>
         </div>
 
@@ -112,38 +112,38 @@ export default function CreativeTemplate({ data }) {
             <div key={secIdx} className="print-avoid-break">
               
               {/* Creative Section Title */}
-              <div className="flex items-center gap-4 mb-4">
-                <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest px-4 py-2 bg-purple-50 text-purple-700 rounded-xl inline-block">
+              <div className="flex items-center gap-4 mb-5">
+                <h4 className="text-[10px] font-black text-purple-700 uppercase tracking-[0.2em] px-4 py-2 bg-purple-50 rounded-xl inline-block shadow-sm">
                   {section.title}
                 </h4>
-                <div className="flex-1 border-b border-gray-100 border-dashed"></div>
+                <div className="flex-1 border-b border-slate-200 border-dashed"></div>
               </div>
 
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr>
-                    <th className="py-4 px-2 border-b-2 border-gray-900 text-xs font-black text-gray-900 uppercase tracking-widest">Description</th>
-                    <th className="py-4 px-2 border-b-2 border-gray-900 text-xs font-black text-gray-900 uppercase tracking-widest text-center w-24">Labour</th>
-                    <th className="py-4 px-2 border-b-2 border-gray-900 text-xs font-black text-gray-900 uppercase tracking-widest text-center w-24">Material</th>
-                    <th className="py-4 px-2 border-b-2 border-gray-900 text-xs font-black text-gray-900 uppercase tracking-widest text-right w-32">Total</th>
+                    <th className="pb-3 px-2 border-b-2 border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</th>
+                    <th className="pb-3 px-2 border-b-2 border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center w-24">Labour</th>
+                    <th className="pb-3 px-2 border-b-2 border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center w-24">Material</th>
+                    <th className="pb-3 px-2 border-b-2 border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right w-32">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {section.items && section.items.map((item, index) => (
-                    <tr key={index} className="border-b border-gray-100 border-dashed hover:bg-gray-50/50 transition-colors">
-                      <td className="py-5 px-2 text-sm font-bold text-gray-800 whitespace-pre-wrap">{item.desc}</td>
-                      <td className="py-5 px-2 text-sm text-gray-500 text-center font-medium">{safeFormat(item.labour)}</td>
-                      <td className="py-5 px-2 text-sm text-gray-500 text-center font-medium">{safeFormat(item.material)}</td>
-                      <td className="py-5 px-2 text-base font-black text-gray-900 text-right">Rs. {safeFormat(item.total)}</td>
+                    <tr key={index} className="border-b border-slate-100 border-dashed hover:bg-slate-50/50 transition-colors">
+                      <td className="py-4 px-2 text-[11px] font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{item.desc}</td>
+                      <td className="py-4 px-2 text-[11px] text-slate-500 text-center font-bold">{safeFormat(item.labour)}</td>
+                      <td className="py-4 px-2 text-[11px] text-slate-500 text-center font-bold">{safeFormat(item.material)}</td>
+                      <td className="py-4 px-2 text-sm font-black text-slate-900 text-right">Rs. {safeFormat(item.total)}</td>
                     </tr>
                   ))}
                   
                   {/* Category Subtotal (Soft UI) */}
-                  <tr className="bg-gray-50/50">
-                    <td colSpan="3" className="py-4 px-2 text-right text-xs font-bold text-gray-400 uppercase tracking-widest">
+                  <tr className="bg-slate-50/50">
+                    <td colSpan="3" className="py-3 px-2 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       Category Total
                     </td>
-                    <td className="py-4 px-2 text-right text-base font-bold text-purple-600">
+                    <td className="py-3 px-2 text-right text-sm font-black text-purple-600">
                       Rs. {safeFormat(section.sectionTotal)}
                     </td>
                   </tr>
@@ -154,44 +154,44 @@ export default function CreativeTemplate({ data }) {
         </div>
 
         {/* 💰 BILLING TOTAL (Gradient Impact) */}
-        <div className="flex justify-end mb-12 print-avoid-break">
-          <div className="w-full md:w-96">
-            <div className="flex justify-between items-center mb-3 px-2">
-              <span className="text-gray-500 text-sm font-bold uppercase tracking-wider">Subtotal</span>
-              <span className="font-bold text-gray-800">Rs. {safeFormat(quote.subtotal)}</span>
+        <div className="flex justify-end mb-14 print-avoid-break">
+          <div className="w-full md:w-80">
+            <div className="flex justify-between items-center mb-2.5 px-2 text-[11px]">
+              <span className="text-slate-500 font-bold uppercase tracking-wider">Subtotal</span>
+              <span className="font-black text-slate-800">Rs. {safeFormat(quote.subtotal)}</span>
             </div>
             
             {Number(quote.discount) > 0 && (
-              <div className="flex justify-between items-center mb-3 px-2">
-                <span className="text-gray-500 text-sm font-bold uppercase tracking-wider">Discount</span>
-                <span className="font-bold text-emerald-500">- Rs. {safeFormat(quote.discount)}</span>
+              <div className="flex justify-between items-center mb-2.5 px-2 text-[11px]">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">Discount</span>
+                <span className="font-black text-emerald-500">- Rs. {safeFormat(quote.discount)}</span>
               </div>
             )}
 
             {Number(quote.tax) > 0 && (
-              <div className="flex justify-between items-center mb-4 px-2">
-                <span className="text-gray-500 text-sm font-bold uppercase tracking-wider">Tax</span>
-                <span className="font-bold text-gray-800">Rs. {safeFormat(quote.tax)}</span>
+              <div className="flex justify-between items-center mb-4 px-2 text-[11px]">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">Tax</span>
+                <span className="font-black text-slate-800">Rs. {safeFormat(quote.tax)}</span>
               </div>
             )}
             
             {/* Dark background added for print mode visibility since gradients often fail in PDF generation */}
-            <div className="mt-4 p-6 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-3xl text-white shadow-xl shadow-purple-500/20 flex justify-between items-center transform transition-transform hover:scale-[1.02] print:bg-purple-700 print:shadow-none">
-              <span className="text-sm font-black uppercase tracking-widest opacity-90">Total Payable</span>
-              <span className="text-3xl font-black">Rs. {safeFormat(quote.grandTotal)}</span>
+            <div className="mt-3 p-5 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-2xl text-white shadow-lg shadow-purple-500/20 flex justify-between items-center print:bg-slate-900 print:text-white print:shadow-none">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-90">Total Payable</span>
+              <span className="text-2xl font-black">Rs. {safeFormat(quote.grandTotal)}</span>
             </div>
           </div>
         </div>
 
         {/* 📜 BOTTOM INFO (Grid Layout) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 print-avoid-break">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 print-avoid-break border-t border-slate-100 pt-8">
           
           {/* Payment Terms */}
           <div>
-            <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-500"></span> Terms & Conditions
+            <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span> Terms & Conditions
             </h4>
-            <ul className="text-sm text-gray-500 space-y-2.5 font-medium leading-relaxed">
+            <ul className="text-[11px] text-slate-500 space-y-2 font-semibold leading-relaxed">
               {quote.terms && quote.terms.map((term, i) => (
                  <li key={i} className="flex gap-2">
                    <span className="text-purple-400 font-black shrink-0">{i+1}.</span> 
@@ -202,27 +202,27 @@ export default function CreativeTemplate({ data }) {
           </div>
 
           {/* Bank Details */}
-          <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100">
-            <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-fuchsia-500"></span> Transfer Details
+          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+            <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500"></span> Transfer Details
             </h4>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between items-center pb-2 border-b border-gray-200 border-dashed">
-                <span className="text-gray-500 font-medium">Bank</span>
-                <span className="font-bold text-gray-900">{quote.bankDetails?.bankName || "-"}</span>
+            <div className="space-y-3 text-[11px]">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200 border-dashed">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">Bank</span>
+                <span className="font-black text-slate-900">{quote.bankDetails?.bankName || "-"}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-gray-200 border-dashed">
-                <span className="text-gray-500 font-medium">Account No.</span>
-                <span className="font-bold text-gray-900 tracking-wider">{quote.bankDetails?.accNo || "-"}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200 border-dashed">
+                <span className="text-slate-500 font-bold uppercase tracking-wider">A/C No</span>
+                <span className="font-black text-slate-900 tracking-widest">{quote.bankDetails?.accNo || "-"}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-500 font-medium">IFSC</span>
-                <span className="font-bold text-gray-900 tracking-wider">{quote.bankDetails?.ifsc || "-"}</span>
+                <span className="text-slate-500 font-bold uppercase tracking-wider">IFSC</span>
+                <span className="font-black text-slate-900 tracking-widest">{quote.bankDetails?.ifsc || "-"}</span>
               </div>
               {quote.bankDetails?.accHolder && (
-                <div className="flex justify-between items-center pt-2 border-t border-gray-200 border-dashed mt-1">
-                  <span className="text-gray-500 font-medium">Name</span>
-                  <span className="font-bold text-gray-900">{quote.bankDetails.accHolder}</span>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200 border-dashed mt-1">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider">Name</span>
+                  <span className="font-black text-slate-900">{quote.bankDetails.accHolder}</span>
                 </div>
               )}
             </div>

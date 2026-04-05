@@ -4,13 +4,14 @@ import { sendQuotationPDFEmail } from "../config/mail.js";
 import { Writable } from "stream";
 
 /**
- * Valid template slugs (keep in sync with pdfService.js + TemplateSelector.jsx)
+ * Valid template slugs (Matches Frontend TemplateSelector.jsx)
  */
 const VALID_TEMPLATES = new Set([
   "classic", "modern", "corporate", "compact", "creative", "grouped",
   "obsidian", "sovereign", "aurora",
 ]);
 
+// Helper to fallback to classic if an invalid template is passed
 const resolveTemplate = (raw) =>
   raw && VALID_TEMPLATES.has(raw.toLowerCase()) ? raw.toLowerCase() : "classic";
 
@@ -26,7 +27,7 @@ export const downloadPDF = async (req, res) => {
     const template = resolveTemplate(req.query.template);
     const userId = req.user._id || req.user.id;
 
-    // 1. Fetch quotation (scoped to the authenticated user)
+    // 1. Fetch quotation (Strictly scoped to the authenticated user for security)
     const quotation = await Quotation.findOne({ _id: id, user: userId });
 
     if (!quotation) {
@@ -36,22 +37,29 @@ export const downloadPDF = async (req, res) => {
       });
     }
 
-    // 2. Build a descriptive filename
-    const safeName = (quotation.projectDetails?.clientName || "Document")
-      .replace(/\s+/g, "_")
-      .replace(/[^a-zA-Z0-9_\-]/g, "");
+    // 2. Build a Professional Filename (e.g., Quotation_QTN-101_ClientName.pdf)
+    const clientName = quotation.projectDetails?.clientName || "Document";
+    const quoteNo = quotation.projectDetails?.referenceNo || "Draft";
+    
+    const safeClientName = clientName.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");
+    const safeQuoteNo = quoteNo.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");
 
-    const fileName = `Quotation_${safeName}.pdf`;
+    const fileName = `Quotation_${safeQuoteNo}_${safeClientName}.pdf`;
 
-    // 3. Set response headers
+    // 3. Set proper HTTP headers for PDF streaming
+    // 🔥 FIX: Added res.status(200) explicitly to prevent Express from treating it as an API JSON response
+    res.status(200);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`); // 🔥 Changed to 'attachment' for safe binary download
     res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
 
-    // 4. Stream PDF directly to the browser
+    // 4. Stream PDF directly to the browser (Zero memory bloat)
     await generateQuotationPDF(quotation, res, template);
+    
   } catch (error) {
     console.error("🔥 Download PDF Error:", error.message);
+    
+    // Prevent "Headers already sent" crash
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
@@ -64,7 +72,7 @@ export const downloadPDF = async (req, res) => {
 
 /**
  * =======================================
- * 📧 SEND QUOTATION VIA EMAIL (AS ATTACHMENT)
+ * 📧 SEND QUOTATION VIA EMAIL
  * POST /api/export/email
  * Body: { quotationId, email, template }
  * =======================================
@@ -93,7 +101,7 @@ export const sendEmail = async (req, res) => {
       });
     }
 
-    // 3. Generate PDF into a memory buffer (not streamed to HTTP)
+    // 3. Generate PDF into a memory buffer (Required for email attachments)
     const chunks = [];
     const bufferStream = new Writable({
       write(chunk, _encoding, next) {
@@ -102,24 +110,29 @@ export const sendEmail = async (req, res) => {
       },
     });
 
+    // Wait for the PDF kit to finish writing to the buffer stream
     const pdfBuffer = await new Promise((resolve, reject) => {
       bufferStream.on("finish", () => resolve(Buffer.concat(chunks)));
       bufferStream.on("error", reject);
+      
+      // Start PDF generation and pipe it to our buffer stream
       generateQuotationPDF(quotation, bufferStream, template).catch(reject);
     });
 
-    // 4. Extract display names for the email body
+    // 4. Extract contextual data for the email body
     const clientName  = quotation.projectDetails?.clientName  || "Valued Client";
     const companyName = quotation.projectDetails?.companyName || "Our Company";
+    const quoteNo     = quotation.projectDetails?.referenceNo || "your recent inquiry";
 
-    // 5. Send via the advanced mail service
-    await sendQuotationPDFEmail(email, clientName, pdfBuffer, companyName);
+    // 5. Send via the mail service (Pass quoteNo to make the email subject professional)
+    await sendQuotationPDFEmail(email, clientName, pdfBuffer, companyName, quoteNo);
 
     // 6. Success response
     return res.status(200).json({
       success: true,
       message: `✅ Quotation successfully sent to ${email}`,
     });
+    
   } catch (error) {
     console.error("🔥 Send Email Error:", error.message);
     return res.status(500).json({
