@@ -241,6 +241,252 @@ export default function Export({
 
           <div className="p-10 space-y-8 max-w-4xl mx-auto w-full">
             {/* Status Card */}
+import React, { useState, useMemo } from "react";
+import axios from "axios";
+import Sidebar from "./Sidebar";
+import {
+  FileText,
+  Download,
+  Printer,
+  Share2,
+  Mail,
+  MessageCircle,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  FileCheck,
+  XCircle
+} from "lucide-react";
+
+// 🔥 IMPORT ALL TEMPLATES (Using .jsx extension for Vite stability)
+import ClassicTemplate from "../../components/theme/ClassicTemplate.jsx";
+import ModernTemplate from "../../components/theme/ModernTemplate.jsx";
+import CorporateTemplate from "../../components/theme/CorporateTemplate.jsx";
+import CompactTemplate from "../../components/theme/CompactTemplate.jsx";
+import CreativeTemplate from "../../components/theme/CreativeTemplate.jsx";
+import GroupedTemplate from "../../components/theme/GroupedTemplate.jsx";
+
+export default function Export({
+  user, goBack, goToDashboard, goToCreate, goToPreview, goToExport,
+  goToSubscription, goToSettings, goToHelp, goToEditProfile, quotationId,
+}) {
+  const [toast, setToast] = useState({ show: false, message: "", type: "" });
+  
+  // Separated Loading States
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false); 
+  const [isPreparingWA, setIsPreparingWA] = useState(false); 
+
+  const token = localStorage.getItem("token");
+  const selectedTemplate = localStorage.getItem("selectedTemplate") || "classic";
+  
+  const quotationData = useMemo(() => {
+    const draft = localStorage.getItem("previewDraft");
+    return draft ? JSON.parse(draft) : null;
+  }, []);
+
+  const mappedData = useMemo(() => {
+    if (!quotationData) return null;
+    const totals = {
+      subtotal: quotationData.rateSections?.reduce((acc, sec) => 
+        acc + sec.rows.reduce((rAcc, r) => rAcc + (Number(r.total) || 0), 0), 0) || 0,
+    };
+
+    const formattedSections = quotationData.rateSections?.map(section => ({
+      title: section.title || "Material & Labour Rates",
+      items: section.rows?.map(item => ({
+        desc: item.work || item.workDescription || item.description || "-",
+        labour: Number(item.labour || 0).toFixed(2),
+        material: Number(item.material || 0).toFixed(2),
+        total: Number(item.total || 0).toFixed(2)
+      })) || [],
+      sectionTotal: Number(section.rows?.reduce((acc, r) => acc + (Number(r.total) || 0), 0) || 0).toFixed(2)
+    })) || [];
+
+    const discountPercent = Number(quotationData.pricing?.discount) || 0;
+    const discountAmount = (totals.subtotal * discountPercent) / 100;
+    const tax = Number(quotationData.pricing?.tax) || 0;
+
+    return {
+      ...quotationData.projectDetails,
+      sections: formattedSections,
+      subtotal: totals.subtotal.toFixed(2),
+      discount: discountAmount.toFixed(2),
+      tax: tax.toFixed(2),
+      grandTotal: (totals.subtotal - discountAmount + tax).toFixed(2),
+      terms: quotationData.textAreas?.termsConditions?.split('\n').filter(t => t.trim()) || [],
+      bankDetails: quotationData.bankDetails,
+    };
+  }, [quotationData]);
+
+  const showToast = (msg, type) => {
+    setToast({ show: true, message: msg, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 4000);
+  };
+
+  const handlePrint = () => window.print();
+
+  // 🔗 SHARE LINK
+  const copyShareLink = () => {
+    if (!quotationId) return showToast("Save quotation first! ❌", "error");
+    const link = `${window.location.origin}/preview/public/${quotationId}`;
+    navigator.clipboard.writeText(link);
+    showToast("🔗 Professional Share Link Copied!", "success");
+  };
+
+  // 📄 BULLETPROOF DOWNLOAD LOGIC
+  const handleDownloadPDF = async () => {
+    if (!quotationId) return showToast("Please save the quotation first! ❌", "error");
+
+    setIsDownloadingPDF(true);
+    showToast("Generating Premium PDF... ⏳", "success");
+
+    try {
+      // 🔥 BUG FIXED: Changed localhost:5000 to dynamic VITE_API_URL
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/export/pdf/${quotationId}?template=${selectedTemplate}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob', // Expecting binary data
+          timeout: 90000 
+        }
+      );
+
+      // Prevent downloading backend error JSONs as corrupted PDFs
+      if (response.data.type === "application/json" || response.data.type === "text/html") {
+         const text = await response.data.text();
+         try {
+             const error = JSON.parse(text);
+             throw new Error(error.message || "Server Error");
+         } catch (e) {
+             throw new Error("Invalid response format from server.");
+         }
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Quotation_${mappedData?.clientName?.replace(/\s+/g, '_') || 'File'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        link.remove();
+      }, 100);
+      
+      showToast("✅ Downloaded Successfully!", "success");
+    } catch (error) {
+      console.error("Download Error:", error);
+      showToast(error.message?.includes("Server") ? `❌ ${error.message}` : "❌ Download failed. Check server connection.", "error");
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
+  // 📧 EMAIL
+  const handleSendEmail = async () => {
+    if (!quotationId) return showToast("Save quotation first! ❌", "error");
+    const email = window.prompt("Enter client email:");
+    if (!email) return;
+    setIsSendingEmail(true);
+    try {
+      // 🔥 BUG FIXED: Changed localhost:5000 to dynamic VITE_API_URL
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/export/email`, 
+        { quotationId, email, template: selectedTemplate }, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      showToast("✅ Sent to client's inbox!", "success");
+    } catch (e) { showToast("❌ Email failed.", "error"); }
+    finally { setIsSendingEmail(false); }
+  };
+
+  // 💬 WHATSAPP
+  const handleShareActualPDF = async () => {
+    if (!quotationId) return showToast("Save first! ❌", "error");
+    setIsPreparingWA(true);
+    showToast("Preparing WhatsApp file... ⏳", "success");
+
+    try {
+      // 🔥 BUG FIXED: Changed localhost:5000 to dynamic VITE_API_URL
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/export/pdf/${quotationId}?template=${selectedTemplate}`,
+        { 
+          headers: { Authorization: `Bearer ${token}` }, 
+          responseType: 'blob',
+          timeout: 90000
+        }
+      );
+
+      // Prevent downloading backend error JSONs as corrupted PDFs
+      if (response.data.type === "application/json" || response.data.type === "text/html") {
+         const text = await response.data.text();
+         try {
+             const error = JSON.parse(text);
+             throw new Error(error.message || "Server Error");
+         } catch (e) {
+             throw new Error("Invalid response format from server.");
+         }
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Quotation_${mappedData?.clientName?.replace(/\s+/g, '_') || 'File'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+
+      const waText = encodeURIComponent(`Hello! Please find the quotation attached below.`);
+      window.open(`https://wa.me/?text=${waText}`, "_blank");
+      showToast("✅ File ready! Now attach it in WhatsApp.", "success");
+    } catch (error) { 
+      console.error("WhatsApp prep error:", error);
+      showToast(error.message?.includes("Server") ? `❌ ${error.message}` : "❌ WhatsApp prep failed.", "error"); 
+    }
+    finally { setIsPreparingWA(false); }
+  };
+
+  const RenderSelectedTemplate = () => {
+    if (!mappedData) return null;
+    const props = { data: mappedData };
+    switch(selectedTemplate) {
+      case "modern": return <ModernTemplate {...props} />;
+      case "corporate": return <CorporateTemplate {...props} />;
+      case "compact": return <CompactTemplate {...props} />;
+      case "creative": return <CreativeTemplate {...props} />;
+      case "grouped": return <GroupedTemplate {...props} />;
+      default: return <ClassicTemplate {...props} />;
+    }
+  };
+
+  return (
+    <>
+      <div className="hidden print:block w-full bg-white absolute top-0 left-0 z-[9999]">
+         <RenderSelectedTemplate />
+      </div>
+
+      <div className="print:hidden bg-[#f8fafc] min-h-screen flex text-slate-800 font-sans">
+        <div className="fixed top-0 left-0 h-screen w-[250px] z-30 shadow-sm">
+          <Sidebar active="export" user={user} goToDashboard={goToDashboard} goToCreate={goToCreate} goToPreview={goToPreview} goToExport={goToExport} goToSubscription={goToSubscription} goToSettings={goToSettings} goToHelp={goToHelp} goToEditProfile={goToEditProfile} />
+        </div>
+
+        <div className="ml-[250px] w-full flex flex-col">
+          {/* Header */}
+          <div className="flex justify-between items-center px-10 py-6 bg-white/70 backdrop-blur-xl sticky top-0 z-20 border-b border-slate-200/60 shadow-sm">
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Export Quotation</h1>
+              <p className="text-sm font-medium text-slate-500 mt-1">Download or share your quotation directly.</p>
+            </div>
+            <button onClick={goBack} className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 px-5 py-2.5 rounded-xl hover:bg-slate-50 transition-all">
+              <ArrowLeft size={16} /> Back to Preview
+            </button>
+          </div>
+
+          <div className="p-10 space-y-8 max-w-4xl mx-auto w-full">
+            {/* Status Card */}
             <div className={`p-8 rounded-[2rem] border flex items-center justify-between shadow-sm ${quotationId ? 'bg-emerald-50/50 border-emerald-100' : 'bg-amber-50/50 border-amber-100'}`}>
               <div className="flex items-center gap-5">
                 <div className={`p-4 rounded-2xl ${quotationId ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
